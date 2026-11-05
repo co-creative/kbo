@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Net.Code.Kbo.Api\Net.Code.Kbo.Api.csproj" />
+    <ProjectReference Include="..\Net.Code.Kbo.Web\Net.Code.Kbo.Web.csproj" />
   </ItemGroup>
 
 </Project>

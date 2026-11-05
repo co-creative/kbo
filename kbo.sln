@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Net.Code.Kbo.Build", "Net.C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Net.Code.Kbo.Tests", "Net.Code.Kbo.Tests\Net.Code.Kbo.Tests.csproj", "{DAAC876C-B71B-497A-A2EF-69033BBA2A65}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Net.Code.Kbo.Web", "Net.Code.Kbo.Web\Net.Code.Kbo.Web.csproj", "{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -148,6 +150,18 @@ Global
 		{DAAC876C-B71B-497A-A2EF-69033BBA2A65}.Release|x64.Build.0 = Release|Any CPU
 		{DAAC876C-B71B-497A-A2EF-69033BBA2A65}.Release|x86.ActiveCfg = Release|Any CPU
 		{DAAC876C-B71B-497A-A2EF-69033BBA2A65}.Release|x86.Build.0 = Release|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Debug|x64.Build.0 = Debug|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Debug|x86.Build.0 = Debug|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Release|x64.ActiveCfg = Release|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Release|x64.Build.0 = Release|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Release|x86.ActiveCfg = Release|Any CPU
+		{E2AB79C1-82EB-43CC-921F-B9F917FCFE93}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

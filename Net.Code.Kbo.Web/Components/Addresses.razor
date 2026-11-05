@@ -1,0 +1,21 @@
+<ul class="addresses">
+    @foreach (var a in Items)
+    {
+        <li class="@(a.StrikingOff is null ? null : "struck")">
+            @a.Line
+            <span class="meta">@a.Type@(a.Extra is null ? "" : $" · {a.Extra}")</span>
+            @if (a.StrikingOff is not null)
+            {
+                <span class="meta">struck off @a.StrikingOff</span>
+            }
+            else
+            {
+                <a class="map" href="https://www.openstreetmap.org/search?query=@Uri.EscapeDataString(a.Line)" rel="noopener" target="_blank">map</a>
+            }
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AddressView> Items { get; set; } = [];
+}

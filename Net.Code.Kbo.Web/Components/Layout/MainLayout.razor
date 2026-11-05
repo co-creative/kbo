@@ -1,0 +1,27 @@
+@inherits LayoutComponentBase
+@inject CompanyStore Store
+@inject NavigationManager Nav
+
+<header class="top">
+    <a class="brand" href="@Ui.Link("/", L)">KBO <span>search</span></a>
+    <nav class="langs" aria-label="Language">
+        @foreach (var lang in Lang.All)
+        {
+            <a class="@(lang == L ? "active" : null)" href="@Ui.SwitchLang(Nav, lang)" hreflang="@lang">@lang.ToUpperInvariant()</a>
+        }
+    </nav>
+</header>
+
+<main>
+    @Body
+</main>
+
+<footer>
+    KBO Open Data extract @Store.Release.ExtractNumber, snapshot @Store.Release.SnapshotDate ·
+    @Store.CompanyCount.ToString("N0") companies ·
+    <a href="/api/release">API</a> · <a href="/openapi/v1.json">OpenAPI</a>
+</footer>
+
+@code {
+    string L => Ui.LangOf(Nav);
+}

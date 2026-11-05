@@ -187,7 +187,7 @@ If a word gives no hits, look it up in `fts5vocab(company_fts, 'row')`: candidat
 |---|---|
 | `/` and `/search?q=…&city=…&postalCode=…&lang=…&page=…` | One search box plus an "advanced" fold-out (name, street, city, postal code). Uses a GET form, so every search is a shareable URL. The result list shows name, number, city, juridical form and establishment count, with paging. |
 | `/companies/{number}` | Header with name, number, status, juridical form and start date. Below: main address (with a map link), contacts, activities (main activity first), and establishments as a table showing the first 50 with a "show all" link (bpost has 1,060). Then branches, and a link to the JSON (`/api/companies/{number}`). |
-| Layout | NL/FR/EN language switch (the `lang` query value is kept on links), plus a footer with the extract number and snapshot date from `/api/release`. |
+| Layout | NL/FR language switch (the `lang` query value is kept on links; `code.csv` has no DE/EN descriptions), plus a footer with the extract number and snapshot date. |
 
 - **Rendering:** components with `[StreamRendering]` where useful. No interactive render modes, no component library, and one small CSS file.
 - **Shared code:** the UI injects `CompanyStore` directly, so the API and UI use the same query code.
@@ -232,7 +232,7 @@ Aspire 13 can publish a project as a Container Apps job and add Azure Files volu
 |---|---|---|
 | **0. Spike** (about 1 day) ✅ | Quick `kbo build` on the real 0502 zip | File size, build time, peak RAM, and query latency for get and search (local disk vs. Azure Files mount) are measured and written into §11. The design is confirmed or adjusted. |
 | **1. Core + Build** ✅ | `Net.Code.Kbo`, `Net.Code.Kbo.Build`, tests on a fixture zip | `kbo build` produces a valid db from the real zip, validation passes, and tests are green |
-| **2. Web** | `Net.Code.Kbo.Web` (API + Blazor SSR), tests via `WebApplicationFactory` | Local `dotnet run` (or the AppHost) serves search and detail pages against a built db; tests are green |
+| **2. Web** ✅ | `Net.Code.Kbo.Web` (API + Blazor SSR), tests via `WebApplicationFactory` | Local `dotnet run` (or the AppHost) serves search and detail pages against a built db; tests are green |
 | **3. Azure** | AppHost resources, `azd up`, first release published by the job | The UI works on Azure behind Entra auth; a job run publishes `kbo-0502.db`; rollback has been tested |
 | **4. Cleanup** | Delete `Net.Code.Kbo.Data`, `.Api`, `.Cli` and the superseded specs; update AGENTS.md and README | The solution builds, tests are green, and no EF Core is left |
 | **5. Optional** | Typo tolerance (§7.3), a typeahead island, an automated KBO download (only if the terms allow) | as needed |

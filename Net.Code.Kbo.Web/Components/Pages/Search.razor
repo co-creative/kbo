@@ -1,0 +1,115 @@
+@page "/"
+@page "/search"
+@inject CompanyStore Store
+@inject NavigationManager Nav
+
+<PageTitle>@(HasQuery ? $"{Describe()} · KBO search" : "KBO search")</PageTitle>
+
+<form method="get" action="/search" class="search">
+    <div class="row">
+        <input type="search" name="q" value="@Q" placeholder="Name, street, city, postal code or activity" aria-label="Search" autofocus />
+        <button type="submit">Search</button>
+    </div>
+    <details open="@HasFieldFilter">
+        <summary>Search by field</summary>
+        <div class="fields">
+            <label>Name <input name="name" value="@Name" /></label>
+            <label>Street <input name="street" value="@Street" /></label>
+            <label>City <input name="city" value="@City" /></label>
+            <label>Postal code <input name="postalCode" value="@PostalCode" inputmode="numeric" /></label>
+        </div>
+    </details>
+    @if (L != "nl")
+    {
+        <input type="hidden" name="lang" value="@L" />
+    }
+</form>
+
+@if (!HasQuery)
+{
+    <p class="intro">Search all Belgian enterprises in the KBO / BCE open data by name, address or activity,
+        or enter an enterprise number such as <a href="@Ui.CompanyLink("0403.170.701", L)">0403.170.701</a>.</p>
+}
+else if (Result is { } result)
+{
+    @if (!result.Ranked)
+    {
+        <p class="hint">Only very common words: results are not ranked. Add a name, street or city to narrow the search.</p>
+    }
+    else if (result.IgnoredTerms.Count > 0)
+    {
+        <p class="hint">Ignored very common words: @string.Join(", ", result.IgnoredTerms)</p>
+    }
+
+    @if (result.Items.Count == 0)
+    {
+        <p>No companies found.</p>
+    }
+    else
+    {
+        <ol class="results" start="@(Skip + 1)">
+            @foreach (var c in result.Items)
+            {
+                <li>
+                    <a href="@Ui.CompanyLink(c.Number, L)" class="name">@(c.Name ?? c.Number)</a>
+                    <span class="number">@c.Number</span>
+                    <span class="meta">
+                        @(string.Join(" ", new[] { c.Zip, c.City }.Where(s => s is not null)))
+                        @if (c.JuridicalForm is not null) { <text> · @c.JuridicalForm</text> }
+                        @if (c.Establishments > 0) { <text> · @c.Establishments @(c.Establishments == 1 ? "establishment" : "establishments")</text> }
+                    </span>
+                </li>
+            }
+        </ol>
+        <nav class="pager">
+            @if (CurrentPage > 1)
+            {
+                <a href="@PageLink(CurrentPage - 1)">← Previous</a>
+            }
+            @if (result.Items.Count == CompanyStore.MaxTake)
+            {
+                <a href="@PageLink(CurrentPage + 1)">Next →</a>
+            }
+        </nav>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery] public string? Q { get; set; }
+    [SupplyParameterFromQuery] public string? Name { get; set; }
+    [SupplyParameterFromQuery] public string? Street { get; set; }
+    [SupplyParameterFromQuery] public string? City { get; set; }
+    [SupplyParameterFromQuery] public string? PostalCode { get; set; }
+    [SupplyParameterFromQuery(Name = "lang")] public string? LangParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? PageParameter { get; set; }
+
+    SearchView? Result;
+
+    string L => Lang.Normalize(LangParameter);
+    int CurrentPage => Math.Max(1, PageParameter ?? 1);
+    int Skip => (CurrentPage - 1) * CompanyStore.MaxTake;
+    bool HasFieldFilter => new[] { Name, Street, City, PostalCode }.Any(s => !string.IsNullOrWhiteSpace(s));
+    bool HasQuery => !string.IsNullOrWhiteSpace(Q) || HasFieldFilter;
+
+    protected override void OnInitialized()
+    {
+        if (!HasQuery) return;
+
+        // an enterprise number goes straight to the company page
+        if (!HasFieldFilter && KboNr.TryParse(Q, out var number))
+        {
+            Nav.NavigateTo(Ui.CompanyLink(number.ToString(), L));
+            return;
+        }
+
+        var result = Store.Search(new SearchQuery { Text = Q, Name = Name, Street = Street, City = City, PostalCode = PostalCode }, Skip);
+        Result = new SearchView(result.Items.Select(s => SummaryView.Create(s, Store.Codes, L)).ToList(), result.Ranked, result.IgnoredTerms);
+    }
+
+    string Describe() => string.Join(" ", new[] { Q, Name, Street, City, PostalCode }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+    string PageLink(int page) => Ui.Link("/search", L, ("q", Q), ("name", Name), ("street", Street), ("city", City), ("postalCode", PostalCode),
+                                         ("page", page == 1 ? null : page.ToString()));
+
+    sealed record SearchView(IReadOnlyList<SummaryView> Items, bool Ranked, IReadOnlyList<string> IgnoredTerms);
+}

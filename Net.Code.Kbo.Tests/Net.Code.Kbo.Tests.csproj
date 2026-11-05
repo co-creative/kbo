@@ -10,11 +10,13 @@
 
   <ItemGroup>
     <PackageReference Include="TUnit" Version="1.80.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="11.0.0-rc.3.26522.148" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Net.Code.Kbo\Net.Code.Kbo.csproj" />
     <ProjectReference Include="..\Net.Code.Kbo.Build\Net.Code.Kbo.Build.csproj" />
+    <ProjectReference Include="..\Net.Code.Kbo.Web\Net.Code.Kbo.Web.csproj" />
   </ItemGroup>
 
 </Project>
