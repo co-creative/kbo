@@ -105,7 +105,7 @@ class ImportCodes(string path, ImportHelper helper) : PipelineStep("Import Codes
             AND s.Language = CodeDescription.Language
             AND s.Description <> CodeDescription.Description
         );
-        """);
+        """).AsNonQuery();
 
         db.Sql("""
         DELETE FROM CodeDescription
@@ -157,7 +157,7 @@ class ImportEstablishments(string path, ImportHelper helper, bool incremental)
 }
 
 class ImportBranches(string path, ImportHelper helper, bool incremental)
-: CsvImportStep<Data.Import.Branch, Tables.Branches>("Import Branches", path, helper, nameof(Tables.Enterprises.TypeOfEnterpriseId), Tables.Branches.MapFrom, incremental)
+: CsvImportStep<Data.Import.Branch, Tables.Branches>("Import Branches", path, helper, nameof(Tables.Branches.Id), Tables.Branches.MapFrom, incremental)
 {
 }
 
@@ -216,27 +216,35 @@ class RebuildCompanyDocuments() : PipelineStep("Rebuild CompanyDocuments")
               GROUP BY m.EnterpriseNumber
             ),
             addr AS (
+              -- all addresses of the enterprise and its establishments/branches; group_concat keeps every
+              -- distinct street/city/postal code searchable (MAX would keep only one of them)
               SELECT m.EnterpriseNumber,
-                     MAX(CASE WHEN a.MunicipalityNL IS NOT NULL THEN a.StreetNL END)  AS street_nl,
-                     MAX(CASE WHEN a.MunicipalityFR IS NOT NULL THEN a.StreetFR END)  AS street_fr,
-                     MAX(a.MunicipalityNL) AS city_nl,
-                     MAX(a.MunicipalityFR) AS city_fr,
-                     MAX(a.Zipcode)        AS postal_code
+                     group_concat(DISTINCT CASE WHEN a.MunicipalityNL IS NOT NULL THEN a.StreetNL END) AS street_nl,
+                     group_concat(DISTINCT CASE WHEN a.MunicipalityFR IS NOT NULL THEN a.StreetFR END) AS street_fr,
+                     group_concat(DISTINCT a.MunicipalityNL) AS city_nl,
+                     group_concat(DISTINCT a.MunicipalityFR) AS city_fr,
+                     group_concat(DISTINCT a.Zipcode)        AS postal_code
               FROM Addresses a
-              JOIN map m ON m.EnterpriseNumber = a.EntityNumber
+              JOIN map m ON m.EntityNumber = a.EntityNumber
               WHERE a.DateStrikingOff IS NULL OR a.DateStrikingOff = ''
               GROUP BY m.EnterpriseNumber
             ),
+            -- de-duplicate (enterprise, NACE code) pairs BEFORE joining the (multilingual) description text:
+            -- establishments repeat the same codes, and sorting ~34M rows x 4 languages of text exhausts memory
+            act_codes AS (
+              SELECT DISTINCT m.EnterpriseNumber, act.NaceCodeId
+              FROM Activities act
+              JOIN map m ON m.EntityNumber = act.EntityNumber
+            ),
             acts AS (
-              SELECT m.EnterpriseNumber,
+              SELECT ac.EnterpriseNumber,
                 COALESCE(group_concat(CASE WHEN cd.Language = 'NL' THEN cd.Description END, ' '), '') AS activity_desc_nl,
                 COALESCE(group_concat(CASE WHEN cd.Language = 'FR' THEN cd.Description END, ' '), '') AS activity_desc_fr,
                 COALESCE(group_concat(CASE WHEN cd.Language = 'DE' THEN cd.Description END, ' '), '') AS activity_desc_de,
                 COALESCE(group_concat(CASE WHEN cd.Language = 'EN' THEN cd.Description END, ' '), '') AS activity_desc_en
-              FROM Activities act
-              JOIN map m ON m.EnterpriseNumber = act.EntityNumber
-              JOIN CodeDescription cd ON cd.CodeId = act.NaceCodeId
-              GROUP BY m.EnterpriseNumber
+              FROM act_codes ac
+              JOIN CodeDescription cd ON cd.CodeId = ac.NaceCodeId
+              GROUP BY ac.EnterpriseNumber
             ),
             agg AS (
               SELECT 
@@ -406,25 +414,29 @@ internal class ImportService : IImportService
     }
     public int ImportFiles(string folder, IEnumerable<string> files, bool incremental, CancellationToken ct = default)
     {
-        var enterprises = files.Contains("enterprise") ? 
-            new ImportEnterprises(Path.Combine(folder, "enterprise.csv"), helper, incremental) : 
+        // accept both "address" and "address.csv"
+        files = files.Select(f => Path.GetFileNameWithoutExtension(f).ToLowerInvariant()).ToList();
+        string PathOf(string name) => Path.Combine(folder, name + ".csv");
+
+        var enterprises = files.Contains("enterprise") ?
+            new ImportEnterprises(PathOf("enterprise"), helper, incremental) :
             null;
 
         var pipeline = new Pipeline((
             from f in files
-            let step = f switch 
+            let step = f switch
             {
-                "meta" => (PipelineStep)new ImportMeta(Path.Combine(folder, f), helper),
-                "code" => new ImportCodes(Path.Combine(folder, f), helper),
+                "meta" => (PipelineStep)new ImportMeta(PathOf(f), helper),
+                "code" => new ImportCodes(PathOf(f), helper),
                 "enterprise" => enterprises,
-                "establishment" => new ImportEstablishments(Path.Combine(folder, f), helper, incremental),
-                "branch" => new ImportBranches(Path.Combine(folder, f), helper, incremental),
-                "address" => new ImportAddresses(Path.Combine(folder, f), helper, incremental),
-                "denomination" => new ImportDenominations(Path.Combine(folder, f), helper, incremental),
-                "contact" => new ImportContacts(Path.Combine(folder, f), helper, incremental),
-                "activity" => new ImportActivities(Path.Combine(folder, f), helper, incremental),
+                "establishment" => new ImportEstablishments(PathOf(f), helper, incremental),
+                "branch" => new ImportBranches(PathOf(f), helper, incremental),
+                "address" => new ImportAddresses(PathOf(f), helper, incremental),
+                "denomination" => new ImportDenominations(PathOf(f), helper, incremental),
+                "contact" => new ImportContacts(PathOf(f), helper, incremental),
+                "activity" => new ImportActivities(PathOf(f), helper, incremental),
                 _ => null
-            } 
+            }
             where step is not null
             select step).ToList(), reporter
         );
@@ -516,7 +528,7 @@ internal class ImportHelper
             return -1;
         }
 
-        db.DropAndRecreate(tableName);
+        var indexes = db.DropAndRecreate(tableName);
 
         db.Sql("BEGIN IMMEDIATE TRANSACTION;").AsNonQuery();
 
@@ -540,6 +552,12 @@ internal class ImportHelper
             where mapped.Success && mapped.Target is not null
             select mapped.Target
         );
+
+        foreach (var index in indexes)
+        {
+            ct.ThrowIfCancellationRequested();
+            db.Sql(index).AsNonQuery();
+        }
 
         db.Sql("COMMIT;").AsNonQuery();
 
@@ -569,7 +587,12 @@ internal class ImportHelper
 
         db.Sql("BEGIN IMMEDIATE TRANSACTION;").AsNonQuery();
         int deleted = 0;
-        IEnumerable<string> deleteKeys = File.ReadLines(path_deleted).Skip(1);
+        // Delete files hold the key in the first column, quoted like all KBO CSV values ("0200.065.765").
+        var deleteKeys = File.ReadLines(path_deleted)
+            .Skip(1)
+            .Select(line => line.Split(',', 2)[0].Trim().Trim('"'))
+            .Where(key => key.Length > 0)
+            .Distinct();
 
         db.Sql("CREATE TEMP TABLE ToDelete (Key TEXT PRIMARY KEY);").AsNonQuery();
         db.Insert(deleteKeys.Select(x => new Tables.ToDelete { Key = x }));

@@ -98,6 +98,7 @@ public class KboDataContext(DbContextOptions<KboDataContext> options) : DbContex
 
         var contact = modelBuilder.Entity<Contact>();
         contact.HasKey(c => c.Id);
+        contact.HasIndex(c => c.EntityNumber); // lookups by enterprise/establishment/branch number
         contact.Property(c => c.Id).ValueGeneratedOnAdd();
         contact.HasOne(c => c.EntityContact)
             .WithMany().IsRequired(true);
@@ -106,6 +107,7 @@ public class KboDataContext(DbContextOptions<KboDataContext> options) : DbContex
 
         var denomination = modelBuilder.Entity<Denomination>();
         denomination.HasKey(d => new { d.Id });
+        denomination.HasIndex(d => d.EntityNumber); // lookups by enterprise/establishment/branch number
         denomination.Property(d => d.Id).ValueGeneratedOnAdd();
         denomination.HasOne(d => d.TypeOfDenomination)
             .WithMany()
@@ -120,6 +122,7 @@ public class KboDataContext(DbContextOptions<KboDataContext> options) : DbContex
 
         var activity = modelBuilder.Entity<Activity>();
         activity.HasKey(a => a.Id);
+        activity.HasIndex(a => a.EntityNumber); // lookups by enterprise/establishment/branch number
         activity.Property(a => a.Id).ValueGeneratedOnAdd();
         activity.HasOne(a => a.ActivityGroup)
             .WithMany().IsRequired(true);
