@@ -6,7 +6,7 @@ using Net.Code.Kbo.Data.Service;
 
 using TUnit.Core.Interfaces;
 
-namespace Net.Code.Kbo.Tests;
+namespace Net.Code.Kbo.Data.Tests;
 
 /// <summary>
 /// Writes a tiny KBO-shaped CSV dataset to a temp folder, runs the full import pipeline

@@ -1,7 +1,3 @@
-using System.ComponentModel;
-
-using Net.Code.Kbo.Data.Service;
-
 namespace Net.Code.Kbo.Tests;
 
 public class KboNrTests
@@ -13,60 +9,52 @@ public class KboNrTests
     [Arguments("BE 0403.170.701")]
     public async Task TryParse_AcceptsAnyFormatWithTenDigits(string input)
     {
-        var ok = KboNr.TryParse(input, out var kbonr);
-
-        await Assert.That(ok).IsTrue();
-        await Assert.That(kbonr.Value).IsEqualTo(403170701L);
+        await Assert.That(KboNr.TryParse(input, out var kbo)).IsTrue();
+        await Assert.That(kbo.Value).IsEqualTo(403170701L);
     }
 
     [Test]
     [Arguments(null)]
     [Arguments("")]
-    [Arguments("403170701")]      // 9 digits
-    [Arguments("04031707011")]    // 11 digits
+    [Arguments("403170701")]
+    [Arguments("04031707011")]
     [Arguments("not a number")]
-    public async Task TryParse_RejectsInvalidInput(string? input)
+    public async Task TryParse_RejectsInputWithoutExactlyTenDigits(string? input)
     {
         await Assert.That(KboNr.TryParse(input, out _)).IsFalse();
     }
 
     [Test]
-    public async Task Parse_ThrowsFormatException_OnInvalidInput()
+    public async Task Parse_Throws_OnInvalidInput()
     {
         await Assert.That(() => KboNr.Parse("123")).Throws<FormatException>();
     }
 
     [Test]
-    public async Task ToString_Default_IsTenDigitsZeroPadded()
+    public async Task ToString_IsDotted_AndNIsTenDigits()
     {
-        var kbonr = KboNr.Parse("0403.170.701");
+        var kbo = KboNr.Parse("0403170701");
 
-        await Assert.That(kbonr.ToString()).IsEqualTo("0403170701");
+        await Assert.That(kbo.ToString()).IsEqualTo("0403.170.701");
+        await Assert.That(kbo.ToString("N")).IsEqualTo("0403170701");
     }
 
     [Test]
-    public async Task ToString_F_IsDottedFormat()
+    [Arguments("0403.170.701", true)]   // real numbers: 97 - (04031707 mod 97) = 01
+    [Arguments("0200.065.765", true)]
+    [Arguments("0403.170.702", false)]
+    public async Task HasValidCheckDigits(string number, bool expected)
     {
-        var kbonr = KboNr.Parse("0403170701");
-
-        await Assert.That(kbonr.ToString("F")).IsEqualTo("0403.170.701");
+        await Assert.That(KboNr.Parse(number).HasValidCheckDigits).IsEqualTo(expected);
     }
 
     [Test]
-    public async Task ToString_OfDefault_IsEmpty()
+    [Arguments(403170701L, "0403.170.701")]
+    [Arguments(2123456789L, "2.123.456.789")]
+    [Arguments(9000006626L, "9.000.006.626")]
+    public async Task EntityNumber_FormatsEnterprisesAndUnits(long value, string expected)
     {
-        await Assert.That(default(KboNr).ToString()).IsEqualTo(string.Empty);
-    }
-
-    [Test]
-    public async Task TypeConverter_RoundTripsFromString()
-    {
-        // Used by ASP.NET Core minimal API route binding (/companies/{id})
-        var converter = TypeDescriptor.GetConverter(typeof(KboNr));
-
-        var value = (KboNr)converter.ConvertFrom("0403 170 701")!;
-
-        await Assert.That(value.Value).IsEqualTo(403170701L);
-        await Assert.That(converter.ConvertTo(value, typeof(string))).IsEqualTo("0403.170.701");
+        await Assert.That(EntityNumber.Format(value)).IsEqualTo(expected);
+        await Assert.That(EntityNumber.Parse(expected)).IsEqualTo(value);
     }
 }

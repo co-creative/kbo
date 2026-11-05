@@ -10,11 +10,11 @@
 
   <ItemGroup>
     <PackageReference Include="TUnit" Version="1.80.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="11.0.0-rc.3.26522.148" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Net.Code.Kbo.Data\Net.Code.Kbo.Data.csproj" />
+    <ProjectReference Include="..\Net.Code.Kbo\Net.Code.Kbo.csproj" />
+    <ProjectReference Include="..\Net.Code.Kbo.Build\Net.Code.Kbo.Build.csproj" />
   </ItemGroup>
 
 </Project>

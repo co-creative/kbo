@@ -1,6 +1,6 @@
 using Net.Code.Kbo.Data.Service;
 
-namespace Net.Code.Kbo.Tests;
+namespace Net.Code.Kbo.Data.Tests;
 
 /// <summary>
 /// End-to-end: CSV → SQLite import pipeline → ICompanyService queries.

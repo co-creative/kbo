@@ -1,6 +1,6 @@
 using Net.Code.Kbo.Data.Service;
 
-namespace Net.Code.Kbo.Tests;
+namespace Net.Code.Kbo.Data.Tests;
 
 /// <summary>
 /// Regression tests for import/search bugs found during the .NET 11 upgrade. Each test gets its own freshly imported database.

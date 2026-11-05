@@ -160,7 +160,7 @@ Empty values are omitted from the JSON.
 - **At startup:** read `current.txt` and open `Data Source=file:<share>/kbo-<n>.db?immutable=1;Mode=ReadOnly` (URI support to be confirmed in the spike). Then load `code` into a `CodeBook` and read `release`.
 - **`Get(KboNr)`:** one primary-key read. The document is projected to the requested language through `CodeBook` (fallback order: requested → NL → FR → any).
 - **`Search(SearchQuery, skip, take)`:** a `MATCH` query ordered by `bm25(company_fts, 5, 1, 4, 2.5, 0.5)` (name, street, city, postal code, activity), returning summaries. `take` is capped at 25. Sort and limit inside the FTS subquery, then join `company` for only those rows (3–4× faster, §11).
-- **Very common words:** `SearchQuery` drops terms that match more than about 10% of companies (document counts from `fts5vocab`) when the query has other terms. If only such terms remain, it returns them unranked (`ORDER BY rowid LIMIT 25`) with a "too broad" hint.
+- **Very common terms:** a term is common when its index entries (prefix-expanded, summed from `company_fts_vocab`) cover more than 10% of companies. Common free-text terms are dropped when other terms remain. Otherwise, common terms, including field filters, are matched exactly without a wildcard and returned unranked (`LIMIT` without `ORDER BY`) with a "too broad" hint. Without a prefix index, expanding `de*`, `ge*` or `ver*` costs 0.5–2.5 s, while exact `"de"` costs 0.2 ms (§11).
 - **Turning input into a search query (`SearchQuery`):**
   - Free text is tokenized like today (letters; 4-digit numbers kept, other digit runs dropped; at most 12 tokens). Each token is emitted as a quoted string, which neutralizes FTS5 syntax; letter tokens get `*` for prefix matching.
   - Structured parameters become column filters, e.g. `city:"gent"*` or `postal_code:"9000"`.
@@ -230,8 +230,8 @@ Aspire 13 can publish a project as a Container Apps job and add Azure Files volu
 
 | Phase | Deliverable | Done when |
 |---|---|---|
-| **0. Spike** (about 1 day) | Quick `kbo build` on the real 0502 zip | File size, build time, peak RAM, and query latency for get and search (local disk vs. Azure Files mount) are measured and written into §11. The design is confirmed or adjusted. |
-| **1. Core + Build** | `Net.Code.Kbo`, `Net.Code.Kbo.Build`, tests on a fixture zip | `kbo build` produces a valid db from the real zip, validation passes, and tests are green |
+| **0. Spike** (about 1 day) ✅ | Quick `kbo build` on the real 0502 zip | File size, build time, peak RAM, and query latency for get and search (local disk vs. Azure Files mount) are measured and written into §11. The design is confirmed or adjusted. |
+| **1. Core + Build** ✅ | `Net.Code.Kbo`, `Net.Code.Kbo.Build`, tests on a fixture zip | `kbo build` produces a valid db from the real zip, validation passes, and tests are green |
 | **2. Web** | `Net.Code.Kbo.Web` (API + Blazor SSR), tests via `WebApplicationFactory` | Local `dotnet run` (or the AppHost) serves search and detail pages against a built db; tests are green |
 | **3. Azure** | AppHost resources, `azd up`, first release published by the job | The UI works on Azure behind Entra auth; a job run publishes `kbo-0502.db`; rollback has been tested |
 | **4. Cleanup** | Delete `Net.Code.Kbo.Data`, `.Api`, `.Cli` and the superseded specs; update AGENTS.md and README | The solution builds, tests are green, and no EF Core is left |
@@ -248,7 +248,9 @@ Spike on 2026-11-05: a single-file streaming build of extract 0502 straight from
 | `Get` latency | < 1 ms | **0.016 ms** random, 0.9 ms for bpost |
 | `Search` specific ("colruyt halle", "bakkerij 9000", "city:gent name:bakkerij") | about 5 ms | **0.5–11 ms** warm, 4–14 ms cold |
 | `Search` common prefix ("gent*" 58k hits, "antw*" 103k, "bv*" 57k) | ? | **100–290 ms** (83–112 ms with the prefix index). Joining `company` before sorting made it 3–4× slower. |
-| `Search` stopword ("de", 1.66M of 1.97M companies) | ? | **1.5–4.8 s**, handled by the common-word rule (§7.1) |
+| `Search` stopword ("de", 1.66M of 1.97M companies) | ? | **1.5–4.8 s** as a prefix; handled by the common-term rule (§7.1): exact `"de"` takes 0.2 ms and the frequency check 80–190 ms |
+| **Phase 1 `kbo build` (Net.Code.Csv, real zip)** | | **4.9 min, 3.45 GB peak RAM, 4.31 GB file**; validation: 183/190 sampled companies found by name |
+| **Phase 1 CLI search incl. process start** | | `colruyt halle` 0.23 s, `gent` 0.39 s, `de` / `ge` / `van de` 0.4–0.7 s |
 | Read-only URI `file:…?immutable=1` with Microsoft.Data.Sqlite (Q4) | ? | **works** |
 | Azure Files latency, cold start | ? | not measurable from a laptop; measure in phase 3 |
 
