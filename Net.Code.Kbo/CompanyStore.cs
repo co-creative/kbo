@@ -106,15 +106,19 @@ public sealed class CompanyStore
         }
 
         // 1. Names containing the typed words as a phrase, in order, common words included ("co-creative" → name:"co creative"*).
+        //    The words come from the Name field when it is filled in, otherwise from the free text.
         //    Someone typing (part of) a literal name expects those first. Plain BM25 gets this wrong: it favours names that
         //    repeat a word, and penalizes big companies whose name column also holds all their establishments' names.
         //    So the phrase hits are ordered by how well the company's own (legal) name matches, then by BM25.
         // 2. Then the normal BM25 ranking over all columns. Both are cut at skip + take, merged, then paged.
         var window = skip + take;
         var rows = new List<(long Number, CompanySummary Summary)>(window);
-        if (NamePhrase(terms, modes, match) is { } phrase)
+        var nameWords = terms.Where(t => t.Column == "name").ToList() is { Count: > 0 } fromNameField
+            ? fromNameField
+            : terms.Where(t => t.Column is null).ToList();
+        if (NamePhrase(nameWords, terms.Except(nameWords).Except(dropped), modes) is { } phrase)
         {
-            var typed = string.Join(' ', terms.Where(t => t.Column is null).Select(t => t.IndexForm()));
+            var typed = string.Join(' ', nameWords.Select(t => t.IndexForm()));
             rows.AddRange(Ranked(con, phrase, Math.Max(window, PhraseCandidates))
                 .OrderBy(r => NameCloseness(SearchQuery.Words(r.Summary.Name), typed)) // stable: keeps BM25 order within a group
                 .Take(window));
@@ -149,19 +153,18 @@ public sealed class CompanyStore
     }
 
     /// <summary>
-    /// <c>name : "w1 w2 … wn"*</c> for the free-text words, plus the field filters. Null when every free-text word is
-    /// common (such a phrase says little and is expensive). The last word keeps its wildcard (someone still typing:
+    /// <c>name : "w1 w2 … wn"*</c> for the name words, AND the other terms. Null when every name word is common
+    /// (such a phrase says little and is expensive). The last word keeps its wildcard (someone still typing:
     /// "co-creat") when that prefix is narrow, or when other words anchor the phrase and it has at least 3 letters:
     /// <c>name:"co creat"*</c> takes 6 ms although "creat*" alone is broad.
     /// </summary>
-    private static string? NamePhrase(IReadOnlyList<SearchTerm> terms, Dictionary<SearchTerm, TermMode> modes, IEnumerable<SearchTerm> match)
+    private static string? NamePhrase(IReadOnlyList<SearchTerm> words, IEnumerable<SearchTerm> others, Dictionary<SearchTerm, TermMode> modes)
     {
-        var words = terms.Where(t => t.Column is null).ToList();
         if (words.All(w => modes[w] == TermMode.Common)) return null;
         var last = words[^1];
         var wildcard = last.Prefix && (modes[last] == TermMode.Prefix || (words.Count > 1 && last.Token.Length >= 3));
         var phrase = $"name : \"{string.Join(' ', words.Select(w => w.Token))}\"{(wildcard ? "*" : "")}";
-        var filters = match.Where(t => t.Column is not null).Select(t => t.ToFts());
+        var filters = others.Select(t => (modes[t] == TermMode.Prefix ? t : t with { Prefix = false }).ToFts());
         return string.Join(' ', filters.Prepend(phrase));
     }
 

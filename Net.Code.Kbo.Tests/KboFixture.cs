@@ -15,7 +15,7 @@ static class KboFixture
     public const string Gamma = "0417.497.106";          // "Gamma BV"
     public const string Delta = "0400.378.485";          // "Delta BV"; only a struck-off address
     public const string CoCreative = "0669.521.714";     // "CO-CREATIVE": a literal name search must rank it first
-    public const string Creatives = "0412.345.678";      // "Creative Creative Creative": wins on plain BM25
+    public const string Creatives = "0412.345.678";      // "Creative Co Creative Creative": wins on plain BM25
     public const string AcmeGent = "2.123.456.789";      // establishment of Acme
     public const string BakeryBranch = "9.000.000.001";  // branch of Bakery
     public const string BakeryName = "Boulangerie \"Dupont\", Fils";
@@ -92,7 +92,7 @@ static class KboFixture
             $"\"{Gamma}\",\"2\",\"001\",\"Gamma BV\"",
             $"\"{Delta}\",\"2\",\"001\",\"Delta BV\"",
             $"\"{CoCreative}\",\"2\",\"001\",\"CO-CREATIVE\"",
-            $"\"{Creatives}\",\"2\",\"001\",\"Creative Creative Creative\"",
+            $"\"{Creatives}\",\"2\",\"001\",\"Creative Co Creative Creative\"",
             $"\"{AcmeGent}\",\"2\",\"003\",\"Acme Gent\"",
             $"\"{BakeryBranch}\",\"1\",\"001\",\"Dupont Leuven\"",
             "\"0999.999.999\",\"2\",\"001\",\"Orphan without enterprise\""]);

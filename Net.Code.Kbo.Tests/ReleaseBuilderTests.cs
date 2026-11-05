@@ -154,6 +154,16 @@ public class ReleaseBuilderTests(BuiltRelease release)
     }
 
     [Test]
+    [Arguments("co-creative")]
+    [Arguments("co-creat")]
+    public async Task Search_LiteralName_InNameField_RanksFirst(string name)
+    {
+        var result = Store.Search(new SearchQuery { Name = name });
+
+        await Assert.That(result.Items[0].Number).IsEqualTo(CoCreative);
+    }
+
+    [Test]
     public async Task Search_NamePhrase_RespectsFieldFilters()
     {
         var result = Store.Search(new SearchQuery { Text = "creative", PostalCode = "9000" });
