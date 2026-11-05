@@ -93,8 +93,8 @@ CREATE TABLE company (
 CREATE VIRTUAL TABLE company_fts USING fts5(
   name, street, city, postal_code, activity,
   content = '',                     -- contentless: rowid = company.number
-  tokenize = 'unicode61 remove_diacritics 2',
-  prefix = '2 3'
+  tokenize = 'unicode61 remove_diacritics 2'
+  -- no prefix index: it adds 1.8 GB and 40% build time for ~0.1 s on broad prefixes (§11)
 );
 ```
 
@@ -123,6 +123,8 @@ CREATE VIRTUAL TABLE company_fts USING fts5(
 }
 ```
 
+Empty values are omitted from the JSON.
+
 `summary`: `{ "number", "name", "zip", "city": {nl, fr}, "juridicalForm", "status", "establishments": <count> }`.
 
 **NACE versions (decided, Q3):** KBO lists every activity once per NACE-BEL revision (2003, 2008, 2025). Of the 34,412,630 rows, 17.1M are 2025, 15.1M are 2008 and 2.2M are 2003. For example, `0403.170.701`'s main VAT activity appears three times: 2003 `40110`, 2008 `35110`, 2025 `35110`.
@@ -141,7 +143,7 @@ CREATE VIRTUAL TABLE company_fts USING fts5(
    - row counts per source file;
    - the rejected-row rate stays under a threshold (FAX contacts are known and expected);
    - smoke queries, such as known numbers like bpost `0214.596.464` and searches like `colruyt halle`;
-   - file size is under 4 GB.
+   - file size is under 6 GB (the job has 8 GiB of disk; 0502 is 4.46 GB).
 5. **Publish:**
    - copy the file to the share as `kbo-<extract>.db.tmp`, then rename it to `kbo-<extract>.db`;
    - write `current.txt` last;
@@ -157,7 +159,8 @@ CREATE VIRTUAL TABLE company_fts USING fts5(
 
 - **At startup:** read `current.txt` and open `Data Source=file:<share>/kbo-<n>.db?immutable=1;Mode=ReadOnly` (URI support to be confirmed in the spike). Then load `code` into a `CodeBook` and read `release`.
 - **`Get(KboNr)`:** one primary-key read. The document is projected to the requested language through `CodeBook` (fallback order: requested → NL → FR → any).
-- **`Search(SearchQuery, skip, take)`:** a `MATCH` query ordered by `bm25(company_fts, 5, 1, 4, 2.5, 0.5)` (name, street, city, postal code, activity), returning summaries. `take` is capped at 25.
+- **`Search(SearchQuery, skip, take)`:** a `MATCH` query ordered by `bm25(company_fts, 5, 1, 4, 2.5, 0.5)` (name, street, city, postal code, activity), returning summaries. `take` is capped at 25. Sort and limit inside the FTS subquery, then join `company` for only those rows (3–4× faster, §11).
+- **Very common words:** `SearchQuery` drops terms that match more than about 10% of companies (document counts from `fts5vocab`) when the query has other terms. If only such terms remain, it returns them unranked (`ORDER BY rowid LIMIT 25`) with a "too broad" hint.
 - **Turning input into a search query (`SearchQuery`):**
   - Free text is tokenized like today (letters; 4-digit numbers kept, other digit runs dropped; at most 12 tokens). Each token is emitted as a quoted string, which neutralizes FTS5 syntax; letter tokens get `*` for prefix matching.
   - Structured parameters become column filters, e.g. `city:"gent"*` or `postal_code:"9000"`.
@@ -234,23 +237,33 @@ Aspire 13 can publish a project as a Container Apps job and add Azure Files volu
 | **4. Cleanup** | Delete `Net.Code.Kbo.Data`, `.Api`, `.Cli` and the superseded specs; update AGENTS.md and README | The solution builds, tests are green, and no EF Core is left |
 | **5. Optional** | Typo tolerance (§7.3), a typeahead island, an automated KBO download (only if the terms allow) | as needed |
 
-## 11. Measurements (to be filled in by the spike)
+## 11. Measurements
 
-| Metric | Estimate | Measured |
+Spike on 2026-11-05: a single-file streaming build of extract 0502 straight from the zip. Laptop, local SSD, warm OS cache unless noted.
+
+| Metric | Estimate | Measured (local disk) |
 |---|---|---|
-| `kbo-<n>.db` size | 2–3 GB | |
-| Build time / peak RAM | about 10 min / 3–5 GB | |
-| `Get` latency, local disk / Azure Files | < 1 ms / about 5–20 ms | |
-| `Search` "colruyt halle", local disk / Azure Files | about 5 ms / about 50–300 ms | |
-| `Search` worst case (common word, e.g. "gent"), local disk / Azure Files | ? / ? | |
-| Cold start (scale from zero to first page) | a few seconds | |
+| `kbo-<n>.db` size | 2–3 GB | **4.46 GB** (chosen variant: no prefix index, empty JSON values omitted). Documents: 2.18 GB, about 1.2 KB on average; the largest is 666 KB (`0446.891.668`), bpost 497 KB. With `prefix='2 3'` the file was 6.25 GB. |
+| Build time / peak RAM | about 10 min / 3–5 GB | **7.4 min / 3.2 GB** (12 min with the prefix index). Loading the zip takes 47 s. |
+| `Get` latency | < 1 ms | **0.016 ms** random, 0.9 ms for bpost |
+| `Search` specific ("colruyt halle", "bakkerij 9000", "city:gent name:bakkerij") | about 5 ms | **0.5–11 ms** warm, 4–14 ms cold |
+| `Search` common prefix ("gent*" 58k hits, "antw*" 103k, "bv*" 57k) | ? | **100–290 ms** (83–112 ms with the prefix index). Joining `company` before sorting made it 3–4× slower. |
+| `Search` stopword ("de", 1.66M of 1.97M companies) | ? | **1.5–4.8 s**, handled by the common-word rule (§7.1) |
+| Read-only URI `file:…?immutable=1` with Microsoft.Data.Sqlite (Q4) | ? | **works** |
+| Azure Files latency, cold start | ? | not measurable from a laptop; measure in phase 3 |
+
+Consequences for the design (applied in §5–§7):
+- **No prefix index:** it costs 1.8 GB and 40% of build time to save about 0.1 s on broad one-word prefixes.
+- **Search query shape:** sort and limit inside the FTS subquery, then join `company`.
+- **Very common words:** the common-word rule in `SearchQuery`.
+- **No document compression for now:** 4.46 GB fits the job's 8 GiB of disk, and validation fails above 6 GB. If the local-copy upgrade path (§12) is ever needed, compressing `doc` (about 2.2 GB of JSON) is the lever.
 
 ## 12. Risks, open questions, upgrade paths
 
 - **Q1, licence:** check the KBO Open Data terms for redistributing the data through a public API or UI. This decides when built-in auth can be turned off.
 - **Q2, SMB latency:** Azure Files latency for search on common words. Fallback: copy the db to local disk at startup and keep minimum replicas at 1 (≈ €35+/month).
 - **Q3, NACE versions (decided 2026-11-05):** the document keeps the newest version per (entity, group, classification); the search index keeps the descriptions of all versions. See §5.
-- **Q4, URI filenames:** does Microsoft.Data.Sqlite accept the URI filename with `immutable=1`? If not, use `Mode=ReadOnly` and `Cache=Shared`; the file never changes in place anyway.
+- **Q4, URI filenames (resolved):** Microsoft.Data.Sqlite accepts `Data Source=file:<path>?immutable=1;Mode=ReadOnly` (spike).
 - **Q5, FAX contacts (decided 2026-11-05):** `code.csv` has no `FAX` contact type, so the 19,428 FAX rows are skipped. Validation counts them as expected rejections.
 - **Upgrade path, more traffic:** set min replicas to 1 or more and use a local db copy.
 - **Upgrade path, better search:** Azure AI Search. The job also pushes flattened search fields to a new index per release and flips an index alias (aliases are GA in API version 2026-04-01). Full documents stay where they are, in the SQLite file or in Blob. Don't use Table Storage: bpost's document is larger than Table's 64 KiB property limit.
