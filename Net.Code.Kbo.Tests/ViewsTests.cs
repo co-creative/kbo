@@ -18,8 +18,12 @@ public class ViewsTests(BuiltRelease release)
         await Assert.That(v.Addresses[0].Type).IsEqualTo("Adres van de zetel");
         await Assert.That(v.Addresses[0].Line).IsEqualTo("Meir 1, 2000 Antwerpen");
         await Assert.That(v.Names[0]).IsEqualTo(new NameView("Naam", "Nederlands", "Acme Software BV"));
-        await Assert.That(v.Activities[0]).IsEqualTo(new ActivityView("Hoofdactiviteit", "BTW-activiteiten", "2025", "35110",
-            "Productie van elektriciteit uit niet-hernieuwbare bronnen", IsMain: true));
+        // registered for VAT and RSZ: one activity, two registrations
+        var activity = v.Activities.Single();
+        await Assert.That(activity.NaceCode).IsEqualTo("35110");
+        await Assert.That(activity.Description).IsEqualTo("Productie van elektriciteit uit niet-hernieuwbare bronnen");
+        await Assert.That(activity.Classification).IsEqualTo("Hoofdactiviteit");
+        await Assert.That(activity.RegisteredFor).IsEquivalentTo(new[] { "BTW-activiteiten", "RSZ-activiteiten" });
         await Assert.That(v.Establishments[0].Name).IsEqualTo("Acme Gent");
     }
 

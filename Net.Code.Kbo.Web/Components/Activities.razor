@@ -7,7 +7,7 @@
                 <td class="number">@a.NaceCode <span class="meta">(@a.NaceVersion)</span></td>
                 <td>@a.Description</td>
                 <td>@a.Classification</td>
-                <td>@a.Group</td>
+                <td class="meta">@string.Join(", ", a.RegisteredFor)</td>
             </tr>
         }
     </tbody>

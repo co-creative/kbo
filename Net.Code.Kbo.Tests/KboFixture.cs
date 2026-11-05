@@ -59,6 +59,7 @@ static class KboFixture
             .. Code("ContactType", "EMAIL", "E-mail", "E-mail"),
             .. Code("EntityContact", "ENT", "Entiteit", "Entité"),
             .. Code("ActivityGroup", "001", "BTW-activiteiten", "Activités TVA"),
+            .. Code("ActivityGroup", "006", "RSZ-activiteiten", "Activités ONSS"),
             .. Code("Classification", "MAIN", "Hoofdactiviteit", "Activité principale"),
             .. Code("Nace2003", "40110", "Productie van elektriciteit", "Production d'électricité"),
             .. Code("Nace2008", "35110", "Productie van elektriciteit", "Production d'électricité"),
@@ -117,6 +118,7 @@ static class KboFixture
             $"\"{Acme}\",\"001\",\"2003\",\"40110\",\"MAIN\"",
             $"\"{Acme}\",\"001\",\"2008\",\"35110\",\"MAIN\"",
             $"\"{Acme}\",\"001\",\"2025\",\"35110\",\"MAIN\"",
+            $"\"{Acme}\",\"006\",\"2025\",\"35110\",\"MAIN\"",   // same activity, registered for RSZ too
             $"\"{AcmeGent}\",\"001\",\"2025\",\"35110\",\"MAIN\"",
             $"\"{Bakery}\",\"001\",\"2003\",\"15811\",\"MAIN\"",
             $"\"{Bakery}\",\"001\",\"2008\",\"10711\",\"MAIN\""]);

@@ -65,7 +65,7 @@ public class ReleaseBuilderTests(BuiltRelease release)
     [Test]
     public async Task Document_KeepsOnlyNewestNaceVersion()
     {
-        await Assert.That(Doc(Acme).Activities!.Single()).IsEqualTo(new ActivityEntry("001", "2025/35110", "MAIN"));
+        await Assert.That(Doc(Acme).Activities!).IsEquivalentTo(new[] { new ActivityEntry("001", "2025/35110", "MAIN"), new ActivityEntry("006", "2025/35110", "MAIN") });
         await Assert.That(Doc(Bakery).Activities!.Single().Nace).IsEqualTo("2008/10711"); // no 2025 code: falls back
     }
 

@@ -139,22 +139,28 @@ public sealed record ContactView(string Type, string Kind, string Value)
         (contacts ?? []).Select(c => new ContactView(codes.Describe("ContactType", c.Type, lang) ?? c.Type, c.Type, c.Value)).ToList();
 }
 
-public sealed record ActivityView(string Classification, string Group, string NaceVersion, string NaceCode, string? Description, bool IsMain)
+/// <summary>
+/// One activity (NACE code + classification). KBO registers the same activity per activity group
+/// (e.g. VAT and RSZ/ONSS); those are merged into <see cref="RegisteredFor"/>.
+/// </summary>
+public sealed record ActivityView(string Classification, string NaceVersion, string NaceCode, string? Description, bool IsMain, IReadOnlyList<string> RegisteredFor)
 {
     internal static List<ActivityView> List(IReadOnlyList<ActivityEntry>? activities, CodeBook codes, string lang) =>
         (activities ?? [])
-        .OrderBy(a => a.Classification == "MAIN" ? 0 : 1)
-        .ThenBy(a => a.Group)
-        .Select(a =>
+        .GroupBy(a => (a.Nace, a.Classification))
+        .OrderBy(g => g.Key.Classification switch { "MAIN" => 0, "SECO" => 1, _ => 2 })
+        .ThenBy(g => g.Min(a => a.Group))
+        .Select(g =>
         {
-            var slash = a.Nace.IndexOf('/');
+            var (nace, classification) = g.Key;
+            var slash = nace.IndexOf('/');
             return new ActivityView(
-                codes.Describe("Classification", a.Classification, lang) ?? a.Classification,
-                codes.Describe("ActivityGroup", a.Group, lang) ?? a.Group,
-                a.Nace[..Math.Max(0, slash)],
-                a.Nace[(slash + 1)..],
-                codes.DescribeNace(a.Nace, lang),
-                a.Classification == "MAIN");
+                codes.Describe("Classification", classification, lang) ?? classification,
+                nace[..Math.Max(0, slash)],
+                nace[(slash + 1)..],
+                codes.DescribeNace(nace, lang),
+                classification == "MAIN",
+                g.Select(a => a.Group).Distinct().Order().Select(group => codes.Describe("ActivityGroup", group, lang) ?? group).ToList());
         })
         .ToList();
 }
