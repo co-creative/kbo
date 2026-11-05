@@ -52,3 +52,30 @@ public class SearchQueryTests
         await Assert.That(term.Select(t => t.IndexForm())).IsEquivalentTo(new[] { "societe", "liege" });
     }
 }
+
+public class NameClosenessTests
+{
+    [Test]
+    [Arguments("CO-CREATIVE", "co creative", 0)]
+    [Arguments("Électrabel", "electrabel", 0)]
+    [Arguments("ELECTRABEL NORDIC", "electrabel", 1)]
+    [Arguments("Colruyt Group Foundation", "colruyt group", 1)]
+    [Arguments("CO-CREATIVE", "co creat", 2)]                 // last word typed partially
+    [Arguments("bpostgroup", "bpost", 2)]
+    [Arguments("Koninklijke vereniging bpost", "bpost", 3)]
+    [Arguments("Koninklijke vereniging bpostpersoneel", "bpost", 4)]
+    [Arguments("Talal, Chaimae", "co creative", 5)]           // matched via an establishment name
+    public async Task Closeness(string legalName, string typed, int expected)
+    {
+        await Assert.That(CompanyStore.NameCloseness(SearchQuery.Words(legalName), typed)).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task WholeWordsBeatPartialWords()
+    {
+        var gent = CompanyStore.NameCloseness(SearchQuery.Words("Gent helpt Gent"), "gent");
+        var gentaur = CompanyStore.NameCloseness(SearchQuery.Words("GENTAUR MOLECULAR PRODUCTS"), "gent");
+
+        await Assert.That(gent).IsLessThan(gentaur);
+    }
+}

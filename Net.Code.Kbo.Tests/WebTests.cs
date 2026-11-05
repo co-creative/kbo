@@ -91,7 +91,7 @@ public class WebTests(WebApp app)
         var r = await Json("/api/release");
 
         await Assert.That(r.GetProperty("extractNumber").GetInt32()).IsEqualTo(502);
-        await Assert.That(r.GetProperty("counts").GetProperty("companies").GetInt64()).IsEqualTo(4);
+        await Assert.That(r.GetProperty("counts").GetProperty("companies").GetInt64()).IsEqualTo(6);
     }
 
     [Test]

@@ -53,6 +53,10 @@ public sealed partial record SearchQuery
 
     public static string ToMatch(IEnumerable<SearchTerm> terms) => string.Join(' ', terms.Select(t => t.ToFts()));
 
+    /// <summary>Text reduced to index words: "CO-CREATIVE bv" → "co creative bv" (lower case, no diacritics or punctuation).</summary>
+    public static string Words(string? text) =>
+        text is null ? "" : string.Join(' ', Token().Matches(text).Select(m => SearchTerm.Fold(m.Value)));
+
     [GeneratedRegex(@"\p{L}+|\d+")]
     private static partial Regex Token();
 }
@@ -63,9 +67,12 @@ public readonly record struct SearchTerm(string? Column, string Token, bool Pref
     public string ToFts() => $"{(Column is null ? "" : Column + ":")}\"{Token}\"{(Prefix ? "*" : "")}";
 
     /// <summary>The token as stored in the index (lower case, diacritics removed), for fts5vocab lookups.</summary>
-    public string IndexForm()
+    public string IndexForm() => Fold(Token);
+
+    /// <summary>Lower case without diacritics, like the unicode61 tokenizer with remove_diacritics.</summary>
+    public static string Fold(string word)
     {
-        var decomposed = Token.Normalize(NormalizationForm.FormD);
+        var decomposed = word.Normalize(NormalizationForm.FormD);
         var sb = new StringBuilder(decomposed.Length);
         foreach (var c in decomposed)
             if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark) sb.Append(c);

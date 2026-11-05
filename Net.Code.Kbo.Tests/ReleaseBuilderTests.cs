@@ -14,14 +14,14 @@ public class ReleaseBuilderTests(BuiltRelease release)
     public async Task Counts_AndValidation()
     {
         var c = release.Counts;
-        await Assert.That(c["enterprises"]).IsEqualTo(4);
-        await Assert.That(c["companies"]).IsEqualTo(4);
+        await Assert.That(c["enterprises"]).IsEqualTo(6);
+        await Assert.That(c["companies"]).IsEqualTo(6);
         await Assert.That(c["establishments"]).IsEqualTo(1);
         await Assert.That(c["branches"]).IsEqualTo(1);
-        await Assert.That(c["denominations"]).IsEqualTo(8);
+        await Assert.That(c["denominations"]).IsEqualTo(10);
         await Assert.That(c["contactsFaxSkipped"]).IsEqualTo(1);
         await Assert.That(c["orphanEntities"]).IsEqualTo(1);
-        // 1 orphan of 6 entities exceeds the 0.1% limit; that is the only validation error
+        // 1 orphan of 8 entities exceeds the 0.1% limit; that is the only validation error
         await Assert.That(release.ValidationErrors.Count).IsEqualTo(1);
         await Assert.That(release.ValidationErrors[0]).Contains("without an enterprise");
     }
@@ -31,7 +31,7 @@ public class ReleaseBuilderTests(BuiltRelease release)
     {
         await Assert.That(Store.Release.ExtractNumber).IsEqualTo(502);
         await Assert.That(Store.Release.SnapshotDate).IsEqualTo("2026-10-03");
-        await Assert.That(Store.CompanyCount).IsEqualTo(4);
+        await Assert.That(Store.CompanyCount).IsEqualTo(6);
     }
 
     [Test]
@@ -139,6 +139,26 @@ public class ReleaseBuilderTests(BuiltRelease release)
         var result = Store.Search(new SearchQuery { Text = text });
 
         await Assert.That(result.Items.Select(i => i.Number)).Contains(expected);
+    }
+
+    [Test]
+    [Arguments("co-creative")]
+    [Arguments("CO CREATIVE")]
+    [Arguments("co-creat")]
+    public async Task Search_LiteralName_RanksFirst(string text)
+    {
+        // without the name-phrase pass, "co" is dropped as common and plain BM25 prefers "Creative Creative Creative"
+        var result = Store.Search(new SearchQuery { Text = text });
+
+        await Assert.That(result.Items[0].Number).IsEqualTo(CoCreative);
+    }
+
+    [Test]
+    public async Task Search_NamePhrase_RespectsFieldFilters()
+    {
+        var result = Store.Search(new SearchQuery { Text = "creative", PostalCode = "9000" });
+
+        await Assert.That(result.Items.Count).IsEqualTo(0);
     }
 
     [Test]

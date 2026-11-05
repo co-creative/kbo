@@ -14,8 +14,8 @@ public sealed class BuiltRelease : IAsyncInitializer, IDisposable
     public List<string> Log { get; } = [];
 
     /// <summary>
-    /// Opened with a 50% common-word threshold: with 4 companies, the default 10% would make every word "common".
-    /// "bv" (3 of 4 companies) is the common word in this fixture.
+    /// Opened with a 40% common-word threshold: with 6 companies, the default 10% would make every word "common".
+    /// "bv" (3 of 6 companies) is the common word in this fixture.
     /// </summary>
     public CompanyStore Store { get; private set; } = null!;
 
@@ -25,7 +25,7 @@ public sealed class BuiltRelease : IAsyncInitializer, IDisposable
         DbPath = Path.Combine(temp.Path, "kbo-0502.db");
         Counts = ReleaseBuilder.Build(zip, DbPath, Log.Add);
         ValidationErrors = Validator.Validate(DbPath, new ValidationOptions(), Log.Add);
-        Store = CompanyStore.Open(DbPath, commonTermFraction: 0.5);
+        Store = CompanyStore.Open(DbPath, commonTermFraction: 0.4);
         return Task.CompletedTask;
     }
 

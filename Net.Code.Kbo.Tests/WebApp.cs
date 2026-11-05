@@ -20,7 +20,7 @@ public sealed class WebApp : IAsyncInitializer, IAsyncDisposable
             .UseEnvironment("Testing")
             .UseSetting("Kbo:Database", release.DbPath)
             .UseSetting("Kbo:Share", null)
-            .UseSetting("Kbo:CommonTermFraction", "0.5"));
+            .UseSetting("Kbo:CommonTermFraction", "0.4"));
         Client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
     }
 
