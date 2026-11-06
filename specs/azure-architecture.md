@@ -255,6 +255,7 @@ Spike on 2026-11-05: a single-file streaming build of extract 0502 straight from
 | **Phase 1 CLI search incl. process start** | | `colruyt halle` 0.23 s, `gent` 0.39 s, `de` / `ge` / `van de` 0.4–0.7 s |
 | Read-only URI `file:…?immutable=1` with Microsoft.Data.Sqlite (Q4) | ? | **works** |
 | Azure Files latency, cold start | ? | not measurable from a laptop; measure in phase 3 |
+| **Azure job `kbo-build` (4 vCPU / 8 GiB, build on local ephemeral disk)** | | **5.1 min end to end** (load 46 s, write 3 min, optimize 40 s, validate 23 s, copy to share 22 s); 3.41 GB peak RAM; 4.31 GB file; 187/190 names found. Building **on the SMB share fails**: SQLite gets "database is locked" (no byte-range locks), so the work directory must be local. |
 
 Consequences for the design (applied in §5–§7):
 - **No prefix index:** it costs 1.8 GB and 40% of build time to save about 0.1 s on broad one-word prefixes.
