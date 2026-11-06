@@ -19,7 +19,7 @@ The official data-model description is `Net.Code.Kbo.Data/Cookbook-KBO-Open-Data
 |---|---|
 | `Net.Code.Kbo` | Core library: `KboNr`/`EntityNumber`, the company document model (`Documents.cs`, JSON source-generated via `KboJson`), `CodeBook`, `SearchQuery` (input → FTS5 MATCH), `CompanyStore` (read-only queries on a release db). |
 | `Net.Code.Kbo.Build` | Console tool, assembly `kbo`: `build`, `release` (the job), `get`, `search`. Turns a KBO zip into a release db. |
-| `Net.Code.Kbo.Web` | The web app: JSON API under `/api` (`CompanyApi.cs`) plus a Blazor UI with **static SSR only** (no interactive render modes), both using `CompanyStore` in-process. `ReleaseLocator` opens `Kbo:Database` (a .db path, used in dev and tests) or `Kbo:Share` (a directory with `current.txt`, used in Azure). |
+| `Net.Code.Kbo.Web` | The web app: JSON API under `/api` (`CompanyApi.cs`) plus a Blazor UI with **static SSR only** (no interactive render modes), both using `CompanyStore` in-process. `ReleaseProvider` opens `Kbo:Database` (a .db path, used in dev and tests) or `Kbo:Share` (a directory with `current.txt`, used in Azure). |
 | `Net.Code.Kbo.Tests` | TUnit tests for the projects above: fixture zip (`KboFixture`), plus web tests through `WebApplicationFactory` (`WebApp`). |
 | `kbo.AppHost`, `kbo.ServiceDefaults` | Aspire: the AppHost runs `Net.Code.Kbo.Web`; phase 3 adds the Azure resources. |
 | `specs/azure-architecture.md` | **The plan**: decisions, schema, document shape, release flow, API/UI design, measurements, open questions. |
@@ -67,6 +67,8 @@ dotnet run --project Net.Code.Kbo.Web            # or: dotnet run --project kbo.
 - **Releasing (`Releaser`):** takes the newest `incoming/*_Full.zip` newer than `current.txt`, builds and validates it, copies it to the share, and writes `current.txt` last. It keeps the current and previous release and moves the zip to `incoming/processed/`. Validation errors mean nothing is published (exit code 1).
 
 ## Web app notes
+
+- **No release yet:** the app starts without one (platform contract: `/health` answers 200 with no data). `ReleaseProvider.Current` is then null and opening is retried on demand, at most every `Kbo:RetryInterval` (10 s). Meanwhile the API returns 503 problem details (`NoReleaseException`) and `MainLayout` shows "No data yet" instead of the page. Once open, a release is kept until the next start.
 
 - **Language:** `?lang=nl|fr` in the query string; anything else falls back to nl. `code.csv` only has NL and FR descriptions. `CompanyView`/`SummaryView` (`Net.Code.Kbo/Views.cs`) resolve codes for both the API and the UI.
 - **Not found:**
