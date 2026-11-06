@@ -1,0 +1,142 @@
+# Owned by the co-creative platform (template dotnet-aca-v1). Changes arrive as pull requests from the
+# platform (sync-app-repo.ps1); edit platform.images.json rather than this file.
+#
+# On push to main: test, build every image in platform.images.json, push to the shared registry tagged with
+# the commit SHA, point the app's web app / jobs at the new images, record the delivery on rg-<slug>, and
+# smoke-test https://<slug>.co-creative.be/health. Infrastructure (scale, settings, capabilities) is defined
+# in the platform repository (apps/<slug>/main.bicepparam), not here.
+#
+# Repository variables (set by the platform's new-app.ps1; no secrets): AZURE_CLIENT_ID, AZURE_TENANT_ID,
+# AZURE_SUBSCRIPTION_ID, ACR_LOGIN_SERVER, APP_SLUG, APP_RESOURCE_GROUP, APP_HOSTNAME.
+name: Platform deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: platform-deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SDK version (global.json sdk.version, else the latest .NET 11)
+        id: sdk
+        run: |
+          v=$(python3 -c "import json; print(json.load(open('global.json')).get('sdk',{}).get('version',''))" 2>/dev/null || true)
+          echo "version=${v:-11.0.x}" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ steps.sdk.outputs.version }}
+          dotnet-quality: preview
+      - name: Test
+        run: |
+          if ls *.slnx *.sln >/dev/null 2>&1; then dotnet test; else echo "no solution file; skipping tests"; fi
+
+  deliver:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      ACR: ${{ vars.ACR_LOGIN_SERVER }}
+      SLUG: ${{ vars.APP_SLUG }}
+      RG: ${{ vars.APP_RESOURCE_GROUP }}
+      SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push images
+        run: |
+          az acr login --name "${ACR%%.*}"
+          python3 - <<'EOF'
+          import json, os, subprocess
+          acr, slug, sha = os.environ['ACR'], os.environ['SLUG'], os.environ['SHA']
+          for img in json.load(open('platform.images.json')):
+              tag = f"{acr}/{slug}/{img['name']}:{sha}"
+              cmd = ['docker', 'build', '-f', img.get('dockerfile', 'Dockerfile'), '-t', tag]
+              if img.get('target'):
+                  cmd += ['--target', img['target']]
+              cmd.append(img.get('context', '.'))
+              subprocess.run(cmd, check=True)
+              subprocess.run(['docker', 'push', tag], check=True)
+              print(f'pushed {tag}')
+          EOF
+
+      - name: Update the app and jobs
+        run: |
+          python3 - <<'EOF'
+          import json, os, subprocess
+          acr, slug, sha, rg = os.environ['ACR'], os.environ['SLUG'], os.environ['SHA'], os.environ['RG']
+          summary = open(os.environ['GITHUB_STEP_SUMMARY'], 'a')
+          for img in json.load(open('platform.images.json')):
+              tag = f"{acr}/{slug}/{img['name']}:{sha}"
+              target = img.get('deploy', '')
+              if target == 'web':
+                  subprocess.run(['az', 'containerapp', 'update', '-g', rg, '-n', f'{slug}-web', '--image', tag, '-o', 'none'], check=True)
+                  summary.write(f'- web: `{tag}`\n')
+              elif target.startswith('job:'):
+                  job = f"{slug}-{target[4:]}"
+                  exists = subprocess.run(['az', 'containerapp', 'job', 'show', '-g', rg, '-n', job, '-o', 'none'], capture_output=True).returncode == 0
+                  if not exists:
+                      print(f'::warning::job {job} is not provisioned (add it to apps/{slug}/main.bicepparam); image {tag} pushed only')
+                      continue
+                  subprocess.run(['az', 'containerapp', 'job', 'update', '-g', rg, '-n', job, '--image', tag, '-o', 'none'], check=True)
+                  summary.write(f'- {job}: `{tag}`\n')
+          EOF
+
+      - name: Record delivery (catalog tags)
+        run: |
+          az tag update --resource-id "/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/$RG" --operation Merge \
+            --tags lastDeliverySha="$SHA" lastDeliveryAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o none
+
+      - name: Verify delivery survived concurrent platform deployments
+        # A platform infrastructure deployment that started before this delivery may have re-applied the previous
+        # image. Re-apply ours if so (the platform also reconciles from the lastDeliverySha tag).
+        run: |
+          python3 - <<'EOF'
+          import json, os, subprocess
+          acr, slug, sha, rg = os.environ['ACR'], os.environ['SLUG'], os.environ['SHA'], os.environ['RG']
+          def image(kind, name):
+              cmd = ['az', 'containerapp'] + (['job'] if kind == 'job' else []) + ['show', '-g', rg, '-n', name,
+                     '--query', 'properties.template.containers[0].image', '-o', 'tsv']
+              p = subprocess.run(cmd, capture_output=True, text=True)
+              return p.stdout.strip() if p.returncode == 0 else None
+          for img in json.load(open('platform.images.json')):
+              target, tag = img.get('deploy', ''), f"{acr}/{slug}/{img['name']}:{sha}"
+              kind, name = ('web', f'{slug}-web') if target == 'web' else ('job', f"{slug}-{target[4:]}") if target.startswith('job:') else (None, None)
+              if not kind:
+                  continue
+              current = image(kind, name)
+              if current is None or current == tag:
+                  continue
+              print(f'::warning::{name} runs {current}; re-applying {tag}')
+              update = ['az', 'containerapp'] + (['job'] if kind == 'job' else []) + ['update', '-g', rg, '-n', name, '--image', tag, '-o', 'none']
+              subprocess.run(update, check=True)
+          EOF
+
+      - name: Smoke test
+        run: |
+          if ! python3 -c "import json,sys; sys.exit(0 if any(i.get('deploy')=='web' for i in json.load(open('platform.images.json'))) else 1)"; then
+            echo "no web component"; exit 0
+          fi
+          url="https://${{ vars.APP_HOSTNAME }}/health"
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+            [ "$code" = "200" ] && { echo "$url: 200"; exit 0; }
+            sleep 15
+          done
+          echo "::error::$url did not return 200 within 10 minutes (last: $code)"; exit 1

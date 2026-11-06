@@ -1,0 +1,4 @@
+[
+  { "name": "web", "dockerfile": "Dockerfile", "context": ".", "target": "web", "deploy": "web" },
+  { "name": "job", "dockerfile": "Dockerfile", "context": ".", "target": "job", "deploy": "job:job" }
+]
