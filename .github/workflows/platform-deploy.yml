@@ -59,9 +59,8 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and push images
+      - name: Build images
         run: |
-          az acr login --name "${ACR%%.*}"
           python3 - <<'EOF'
           import json, os, subprocess
           acr, slug, sha = os.environ['ACR'], os.environ['SLUG'], os.environ['SHA']
@@ -72,6 +71,60 @@ jobs:
                   cmd += ['--target', img['target']]
               cmd.append(img.get('context', '.'))
               subprocess.run(cmd, check=True)
+          EOF
+
+      - name: Contract check (web images start without Azure and answer /health)
+        # Platform runtime contract (platform.md): the web image listens on 8080 and answers GET /health with 200
+        # as soon as the process runs - also without its data or capabilities (first deployment, empty share,
+        # database paused). Fails here instead of producing an unhealthy revision in Azure.
+        # Opt out per image with "smoke": false in platform.images.json.
+        run: |
+          python3 - <<'EOF'
+          import json, os, subprocess, time, urllib.request
+          acr, slug, sha = os.environ['ACR'], os.environ['SLUG'], os.environ['SHA']
+          failed = []
+          for img in json.load(open('platform.images.json')):
+              if img.get('deploy') != 'web' or img.get('smoke', True) is False:
+                  continue
+              tag = f"{acr}/{slug}/{img['name']}:{sha}"
+              name = f"contract-{img['name']}"
+              subprocess.run(['docker', 'run', '-d', '--name', name, '-p', '18080:8080',
+                              '-e', f'APP_SLUG={slug}', '-e', 'PLATFORM_COMPONENT=web', tag], check=True, capture_output=True)
+              ok, last = False, ''
+              for _ in range(60):
+                  try:
+                      with urllib.request.urlopen('http://localhost:18080/health', timeout=2) as r:
+                          if r.status == 200:
+                              ok = True
+                              break
+                          last = f'HTTP {r.status}'
+                  except Exception as e:
+                      last = str(e)[:120]
+                  if subprocess.run(['docker', 'inspect', '-f', '{{.State.Running}}', name], capture_output=True, text=True).stdout.strip() != 'true':
+                      last = 'container exited'
+                      break
+                  time.sleep(1)
+              logs = subprocess.run(['docker', 'logs', '--tail', '30', name], capture_output=True, text=True)
+              subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
+              if ok:
+                  print(f"{img['name']}: /health 200")
+              else:
+                  print(logs.stdout + logs.stderr)
+                  failed.append(f"{img['name']}: {last}")
+          if failed:
+              print('::error::Platform contract: the web image must start without Azure resources or data and answer '
+                    'GET /health with 200 on port 8080 (see platform.md). Failed: ' + '; '.join(failed))
+              raise SystemExit(1)
+          EOF
+
+      - name: Push images
+        run: |
+          az acr login --name "${ACR%%.*}"
+          python3 - <<'EOF'
+          import json, os, subprocess
+          acr, slug, sha = os.environ['ACR'], os.environ['SLUG'], os.environ['SHA']
+          for img in json.load(open('platform.images.json')):
+              tag = f"{acr}/{slug}/{img['name']}:{sha}"
               subprocess.run(['docker', 'push', tag], check=True)
               print(f'pushed {tag}')
           EOF

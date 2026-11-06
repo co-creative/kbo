@@ -15,7 +15,9 @@ Belgian enterprise (KBO Open Data) lookup: API and web UI
 Every push to `main` runs `.github/workflows/platform-deploy.yml`:
 
 1. `dotnet test`
-2. builds each image in `platform.images.json` and pushes it to `crcocreative.azurecr.io/kbo/<name>:<commit sha>`
+2. builds each image in `platform.images.json`, runs the **contract check** (each web image must start on the runner
+   without Azure and answer `/health` with 200; opt out per image with `"smoke": false`), then pushes it to
+   `crcocreative.azurecr.io/kbo/<name>:<commit sha>`
 3. points the web app (`kbo-web`) and jobs (`kbo-<job>`) at the new images
 4. records the delivery on the resource group (tags `lastDeliverySha`, `lastDeliveryAt`)
 5. smoke-tests `https://kbo.co-creative.be/health`
@@ -40,7 +42,7 @@ The CI identity can only push images and update this app's container apps and jo
 | What | How |
 |---|---|
 | Port | HTTP on `8080` (`ASPNETCORE_HTTP_PORTS`), TLS terminated by the platform |
-| Health | `GET /health` returns 200 (liveness/readiness probes, smoke tests) |
+| Health | `GET /health` returns 200 **as soon as the process runs, also without data or capabilities** (first deployment, empty share, paused database). Probes, the CI contract check and smoke tests depend on it. Report missing data in the app itself (for example a 503 or a "no data yet" page), never by failing to start |
 | Identity | User-assigned managed identity; client ID in `AZURE_CLIENT_ID`. Use `ManagedIdentityCredential` in Azure, `DefaultAzureCredential` locally |
 | Telemetry | OpenTelemetry to Application Insights via `APPLICATIONINSIGHTS_CONNECTION_STRING` |
 | Signed-in user | Easy Auth header `X-MS-CLIENT-PRINCIPAL` (when the app uses `auth: entra`) |
