@@ -15,10 +15,11 @@ EXPOSE 8080
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Net.Code.Kbo.Web.dll"]
 
-# Monthly release builder (Container Apps job). Work files on the share (/mnt/kbo/work), not in the container's
-# ~8 GiB ephemeral disk: the 4.3 GB database plus SQLite temp files may not fit. Slower (SMB), but safe on space.
+# Monthly release builder (Container Apps job). Builds on the container's local (ephemeral, 8 GiB at 4 vCPU) disk:
+# SQLite can't write a database on the SMB share ("database is locked": no byte-range locks), and the build fits
+# locally (4.46 GB db, journal off, temp store in memory). The finished file is then copied to the share.
 FROM mcr.microsoft.com/dotnet/runtime:11.0 AS build
 WORKDIR /app
 COPY --from=publish /out/build .
 USER $APP_UID
-ENTRYPOINT ["dotnet", "kbo.dll", "release", "--share", "/mnt/kbo", "--work", "/mnt/kbo/work"]
+ENTRYPOINT ["dotnet", "kbo.dll", "release", "--share", "/mnt/kbo", "--work", "/tmp/kbo-build"]
