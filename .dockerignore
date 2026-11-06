@@ -28,3 +28,7 @@ README.md
 !.git/config
 !.git/packed-refs
 !.git/refs/heads/**
+# Local data (multi-GB release databases) and test output must never enter the build context.
+data/
+**/TestResults/
+TestResults/
