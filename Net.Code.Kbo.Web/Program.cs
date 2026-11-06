@@ -6,17 +6,24 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddOpenApi();
-builder.Services.AddProblemDetails();
+// 503 problem details when there is no release yet (NoReleaseException), see ReleaseProvider
+builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
+{
+    if (ctx.Exception is NoReleaseException e) ctx.ProblemDetails.Detail = e.Message;
+});
+builder.Services.Configure<ExceptionHandlerOptions>(o =>
+    o.StatusCodeSelector = e => e is NoReleaseException ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status500InternalServerError);
 builder.Services.AddRazorComponents();
 // write é, ë, ... as-is instead of &#xE9; (names and descriptions are full of them)
 builder.Services.AddWebEncoders(o => o.TextEncoderSettings = new System.Text.Encodings.Web.TextEncoderSettings(System.Text.Unicode.UnicodeRanges.All));
-builder.Services.AddSingleton(_ => ReleaseLocator.Open(builder.Configuration, builder.Environment));
+builder.Services.AddSingleton<ReleaseProvider>();
+// per request, so a release that appears after startup is picked up; the UI checks ReleaseProvider.Current first
+builder.Services.AddScoped(sp => sp.GetRequiredService<ReleaseProvider>().Current ?? throw new NoReleaseException());
 
 var app = builder.Build();
 
-// fail fast at startup when the release database can't be opened
-var store = app.Services.GetRequiredService<CompanyStore>();
-app.Logger.LogInformation("Serving KBO extract {Extract} ({Companies:N0} companies)", store.Release.ExtractNumber, store.CompanyCount);
+// open the release now if there is one; without one the app still starts (/health 200, API 503, UI "no release yet")
+_ = app.Services.GetRequiredService<ReleaseProvider>().Current;
 
 app.UseExceptionHandler();
 // problem details for empty API errors (404, 400); pages render their own "not found" content

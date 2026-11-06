@@ -41,13 +41,13 @@ static class CompanyApi
 sealed record SearchResponse(IReadOnlyList<SummaryView> Items, bool Ranked, IReadOnlyList<string> IgnoredTerms);
 
 /// <summary>Data only changes with a new release: use it as ETag and let clients cache for an hour.</summary>
-sealed class ReleaseCacheFilter(CompanyStore store) : IEndpointFilter
+sealed class ReleaseCacheFilter : IEndpointFilter
 {
-    private readonly string etag = $"\"{store.Release.ExtractNumber}-{store.Release.BuiltAt}\"";
-
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
+        var release = http.RequestServices.GetRequiredService<CompanyStore>().Release;
+        var etag = $"\"{release.ExtractNumber}-{release.BuiltAt}\"";
         if (http.Request.Headers.IfNoneMatch == etag) return TypedResults.StatusCode(StatusCodes.Status304NotModified);
         http.Response.Headers.ETag = etag;
         http.Response.Headers.CacheControl = "public, max-age=3600";

@@ -157,7 +157,7 @@ Empty values are omitted from the JSON.
 
 ### 7.1 Query layer: `CompanyStore` (singleton)
 
-- **At startup:** read `current.txt` and open `Data Source=file:<share>/kbo-<n>.db?immutable=1;Mode=ReadOnly` (URI support to be confirmed in the spike). Then load `code` into a `CodeBook` and read `release`.
+- **At startup:** (or, when there is no release yet, on the first request after it appears: the app must start and answer `/health` without data) read `current.txt` and open `Data Source=file:<share>/kbo-<n>.db?immutable=1;Mode=ReadOnly` (URI support to be confirmed in the spike). Then load `code` into a `CodeBook` and read `release`.
 - **`Get(KboNr)`:** one primary-key read. The document is projected to the requested language through `CodeBook` (fallback order: requested → NL → FR → any).
 - **`Search(SearchQuery, skip, take)`:** a `MATCH` query ordered by `bm25(company_fts, 5, 1, 4, 2.5, 0.5)` (name, street, city, postal code, activity), returning summaries. `take` is capped at 25. Sort and limit inside the FTS subquery, then join `company` for only those rows (3–4× faster, §11).
 - **Term modes:** each term is matched as a prefix if its prefix expansion is narrow enough (index entries ≤ 10% of companies, read from `company_fts_vocab` and stopping as soon as the limit is passed). Otherwise it is matched as an exact word if *that* is narrow: `co` is in 10k companies, while `co*` covers 6M index entries. Otherwise it is **common** (`de`, `van`). Common free-text terms are dropped when other terms remain. If only common terms remain, they are matched exactly and returned unranked with a "too broad" hint. Without a prefix index, expanding `de*`, `ge*` or `co*` costs 0.5–2.5 s, while exact `"de"` costs 0.2 ms (§11).
