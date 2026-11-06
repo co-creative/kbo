@@ -1,0 +1,18 @@
+<ul class="contacts">
+    @foreach (var c in Items)
+    {
+        <li><span class="meta">@c.Type</span> @if (Href(c) is { } href) { <a href="@href" rel="noopener nofollow">@c.Value</a> } else { @c.Value }</li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ContactView> Items { get; set; } = [];
+
+    static string? Href(ContactView c) => c.Kind switch
+    {
+        "EMAIL" => "mailto:" + c.Value,
+        "TEL" => "tel:" + new string(c.Value.Where(ch => char.IsDigit(ch) || ch == '+').ToArray()),
+        "WEB" => c.Value.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? c.Value : "https://" + c.Value,
+        _ => null,
+    };
+}

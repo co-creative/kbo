@@ -37,13 +37,28 @@ static class Extensions
             return db.Sql($"SELECT COUNT(1) FROM {tableName};").AsScalar<int>();
         }
 
-        public void DropAndRecreate(string tableName)
+        /// <summary>
+        /// Drops and recreates <paramref name="tableName"/> (empty, without indexes).
+        /// Returns the table's explicit CREATE INDEX statements; run them after bulk-loading
+        /// (building an index once is much faster than maintaining it during the insert).
+        /// </summary>
+        public IReadOnlyList<string> DropAndRecreate(string tableName)
         {
             var create = db.Sql($"SELECT sql FROM sqlite_master WHERE type = 'table' AND name = '{tableName}';").AsScalar<string>();
             if (string.IsNullOrEmpty(create))
                 throw new InvalidOperationException($"Table {tableName} not found in database");
+            var indexes = db.Sql($"SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = '{tableName}' AND sql IS NOT NULL;")
+                .AsEnumerable<IndexInfo>()
+                .Select(i => i.sql)
+                .ToList();
             db.Sql($"DROP TABLE IF EXISTS {tableName}").AsNonQuery();
             db.Sql(create).AsNonQuery();
+            return indexes;
         }
+    }
+
+    class IndexInfo
+    {
+        public string sql { get; set; } = null!;
     }
 }

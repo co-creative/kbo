@@ -1,0 +1,18 @@
+<table class="activities">
+    <thead><tr><th>NACE</th><th>Activity</th><th>Kind</th><th>Registered for</th></tr></thead>
+    <tbody>
+        @foreach (var a in Items)
+        {
+            <tr class="@(a.IsMain ? "main" : null)">
+                <td class="number">@a.NaceCode <span class="meta">(@a.NaceVersion)</span></td>
+                <td>@a.Description</td>
+                <td>@a.Classification</td>
+                <td class="meta">@string.Join(", ", a.RegisteredFor)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ActivityView> Items { get; set; } = [];
+}

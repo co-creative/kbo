@@ -361,12 +361,12 @@ class CompanyService(KboDataContext context, IDb db) : ICompanyService
         return companies;
     }
 
-    private static string BuildFtsMatchExpression(string input)
+    internal static string BuildFtsMatchExpression(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return string.Empty;
 
-        // Letters-only tokens and 4-digit numeric tokens (postal codes)
-        var rx = new Regex(@"\p{L}+|\d{4}", RegexOptions.Compiled);
+        // Letters-only tokens and whole digit runs; only 4-digit runs (postal codes) are kept below
+        var rx = new Regex(@"\p{L}+|\d+", RegexOptions.Compiled);
         var matches = rx.Matches(input);
 
         var seen = new HashSet<string>();

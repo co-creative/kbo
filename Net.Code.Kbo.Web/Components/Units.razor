@@ -1,0 +1,28 @@
+@* Establishments or branches; long lists (bpost has 1,060) show the first 50 unless ?all=true. *@
+<table class="units">
+    <thead><tr><th>Number</th><th>Name</th><th>Address</th><th>Main activity</th><th>Since</th></tr></thead>
+    <tbody>
+        @foreach (var u in ShowAll ? Items : Items.Take(Limit))
+        {
+            <tr>
+                <td class="number">@u.Number</td>
+                <td>@u.Name</td>
+                <td>@(u.Addresses.FirstOrDefault()?.Line)</td>
+                <td>@(u.Activities.FirstOrDefault(a => a.IsMain)?.Description)</td>
+                <td>@u.StartDate</td>
+            </tr>
+        }
+    </tbody>
+</table>
+@if (!ShowAll && Items.Count > Limit)
+{
+    <p><a href="@AllLink">Show all @Items.Count</a></p>
+}
+
+@code {
+    const int Limit = 50;
+
+    [Parameter, EditorRequired] public IReadOnlyList<UnitView> Items { get; set; } = [];
+    [Parameter] public bool ShowAll { get; set; }
+    [Parameter] public string AllLink { get; set; } = "";
+}

@@ -1,0 +1,83 @@
+@page "/companies/{Number}"
+@inject CompanyStore Store
+@inject NavigationManager Nav
+
+@if (View is { } c)
+{
+    <PageTitle>@(c.Name ?? c.Number) · KBO search</PageTitle>
+
+    <h1>@(c.Name ?? c.Number)</h1>
+    <dl class="facts">
+        <dt>Enterprise number</dt><dd>@c.Number</dd>
+        <dt>Status</dt><dd>@c.Status</dd>
+        <dt>Juridical form</dt><dd>@c.JuridicalForm</dd>
+        <dt>Juridical situation</dt><dd>@c.JuridicalSituation</dd>
+        <dt>Type</dt><dd>@c.TypeOfEnterprise</dd>
+        <dt>Start date</dt><dd>@c.StartDate</dd>
+    </dl>
+
+    @if (c.Names.Count > 0)
+    {
+        <h2>Names</h2>
+        <table>
+            <thead><tr><th>Name</th><th>Type</th><th>Language</th></tr></thead>
+            <tbody>
+                @foreach (var n in c.Names)
+                {
+                    <tr><td>@n.Value</td><td>@n.Type</td><td>@n.Language</td></tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (c.Addresses.Count > 0)
+    {
+        <h2>Address</h2>
+        <Addresses Items="c.Addresses" />
+    }
+
+    @if (c.Contacts.Count > 0)
+    {
+        <h2>Contact</h2>
+        <Contacts Items="c.Contacts" />
+    }
+
+    @if (c.Activities.Count > 0)
+    {
+        <h2>Activities</h2>
+        <Activities Items="c.Activities" />
+    }
+
+    @if (c.Establishments.Count > 0)
+    {
+        <h2>Establishments <span class="count">@c.Establishments.Count</span></h2>
+        <Units Items="c.Establishments" ShowAll="ShowAll" AllLink="@AllLink" />
+    }
+
+    @if (c.Branches.Count > 0)
+    {
+        <h2>Branches <span class="count">@c.Branches.Count</span></h2>
+        <Units Items="c.Branches" ShowAll="ShowAll" AllLink="@AllLink" />
+    }
+
+    <p class="json"><a href="@Ui.Link($"/api/companies/{c.Number}", L)">This company as JSON</a></p>
+}
+
+@code {
+    [Parameter] public string Number { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "lang")] public string? LangParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "all")] public bool? All { get; set; }
+
+    CompanyView? View;
+    string L => Lang.Normalize(LangParameter);
+    bool ShowAll => All == true;
+    string AllLink => Ui.Link($"/companies/{Number}", L, ("all", "true"));
+
+    protected override void OnInitialized()
+    {
+        if (KboNr.TryParse(Number, out var number) && Store.Get(number) is { } doc)
+            View = CompanyView.Create(doc, Store.Codes, L);
+        else
+            Nav.NotFound(); // renders Pages/NotFound with status 404
+    }
+}
