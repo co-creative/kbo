@@ -12,7 +12,11 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
     if (ctx.Exception is NoReleaseException e) ctx.ProblemDetails.Detail = e.Message;
 });
 builder.Services.Configure<ExceptionHandlerOptions>(o =>
-    o.StatusCodeSelector = e => e is NoReleaseException ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status500InternalServerError);
+{
+    o.StatusCodeSelector = e => e is NoReleaseException ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status500InternalServerError;
+    // expected until the first release: not an unhandled-exception error (log, telemetry, failure alerts)
+    o.SuppressDiagnosticsCallback = ctx => ctx.Exception is NoReleaseException;
+});
 builder.Services.AddRazorComponents();
 // write é, ë, ... as-is instead of &#xE9; (names and descriptions are full of them)
 builder.Services.AddWebEncoders(o => o.TextEncoderSettings = new System.Text.Encodings.Web.TextEncoderSettings(System.Text.Unicode.UnicodeRanges.All));
