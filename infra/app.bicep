@@ -16,5 +16,5 @@ module resources 'br:crcocreative.azurecr.io/bicep/app-resources:1.0.0' = {
   }
 }
 
-@description('Capability settings, applied to the app''s components by platform-deploy.yml.')
+@description('Capability settings, applied to the components of the app by platform-deploy.yml.')
 output env object = resources.outputs.env
