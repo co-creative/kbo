@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://co-creative.be/platform/platform.app.schema.json",
+  "title": "co-creative platform: app configuration (platform.app.json)",
+  "description": "Owned by the co-creative platform. Configuration the app owns: applied with the images by platform-deploy.yml. Components (web, job names) must exist in the platform definition (apps/<slug>/main.bicepparam); CPU, memory and replicas must stay within its ceilings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "web": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "$ref": "#/$defs/cpu" },
+        "memory": { "$ref": "#/$defs/memory" },
+        "minReplicas": { "type": "integer", "minimum": 0, "maximum": 1, "description": "0 = scale to zero (default); 1 = always warm (costs money)." },
+        "maxReplicas": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "env": { "$ref": "#/$defs/env" }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "description": "Keyed by job name (as in the platform definition).",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cpu": { "$ref": "#/$defs/cpu" },
+          "memory": { "$ref": "#/$defs/memory" },
+          "schedule": { "type": "string", "description": "Cron expression (UTC), for scheduled jobs." },
+          "replicaTimeout": { "type": "integer", "minimum": 60, "maximum": 86400, "description": "Seconds before an execution is stopped." },
+          "env": { "$ref": "#/$defs/env" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "cpu": { "type": "string", "enum": ["0.25", "0.5", "0.75", "1", "1.25", "1.5", "1.75", "2", "2.5", "3", "3.5", "4"], "description": "vCPU; memory must be 2 GiB per vCPU." },
+    "memory": { "type": "string", "pattern": "^[0-9.]+Gi$" },
+    "env": {
+      "type": "object",
+      "description": "Plain (non-secret) settings. Platform names (AZURE_CLIENT_ID, APP_SLUG, PLATFORM_*, ...) are reserved.",
+      "additionalProperties": { "type": ["string", "number", "boolean"] }
+    }
+  }
+}

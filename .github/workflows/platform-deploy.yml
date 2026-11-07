@@ -1,10 +1,12 @@
 # Owned by the co-creative platform (template dotnet-aca-v1). Changes arrive as pull requests from the
 # platform (sync-app-repo.ps1); edit platform.images.json rather than this file.
 #
-# On push to main: test, build every image in platform.images.json, push to the shared registry tagged with
-# the commit SHA, point the app's web app / jobs at the new images, record the delivery on rg-<slug>, and
-# smoke-test https://<slug>.co-creative.be/health. Infrastructure (scale, settings, capabilities) is defined
-# in the platform repository (apps/<slug>/main.bicepparam), not here.
+# On push to main: test; deploy the app's own resources (infra/app.bicep); build every image in
+# platform.images.json and push it tagged with the commit SHA; update the web app / jobs with the new images
+# and the configuration in platform.app.json; record the delivery on rg-<slug>; smoke-test /health.
+# The platform repository (apps/<slug>/main.bicepparam) defines which components exist, auth, DNS, mounts,
+# AI and the ceilings.
+# On pull requests: the test job only (nothing is built, pushed or deployed).
 #
 # Repository variables (set by the platform's new-app.ps1; no secrets): AZURE_CLIENT_ID, AZURE_TENANT_ID,
 # AZURE_SUBSCRIPTION_ID, ACR_LOGIN_SERVER, APP_SLUG, APP_RESOURCE_GROUP, APP_HOSTNAME.
@@ -13,6 +15,7 @@ name: Platform deploy
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -20,8 +23,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: platform-deploy
-  cancel-in-progress: false
+  # Deliveries run one at a time and are never cancelled; pull request runs are per PR and superseded by newer pushes.
+  group: ${{ github.event_name == 'pull_request' && format('platform-pr-{0}', github.ref) || 'platform-deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -49,6 +53,7 @@ jobs:
 
   deliver:
     needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       ACR: ${{ vars.ACR_LOGIN_SERVER }}
@@ -57,6 +62,8 @@ jobs:
       SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # deliver.py reads the previously delivered platform.app.json (removed settings)
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -64,6 +71,14 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: App resources (infra/app.bicep)
+        # The app's own resources in rg-<slug> (storage, SQL, Service Bus, SignalR) from the platform's registry
+        # module; their settings are applied to the components below. Skipped without infra/app.bicep.
+        run: python3 .github/platform/deliver.py resources
+
+      - name: Validate configuration (platform.app.json)
+        run: python3 .github/platform/deliver.py validate
 
       - name: Build images
         run: |
@@ -135,27 +150,10 @@ jobs:
               print(f'pushed {tag}')
           EOF
 
-      - name: Update the app and jobs
-        run: |
-          python3 - <<'EOF'
-          import json, os, subprocess
-          acr, slug, sha, rg = os.environ['ACR'], os.environ['SLUG'], os.environ['SHA'], os.environ['RG']
-          summary = open(os.environ['GITHUB_STEP_SUMMARY'], 'a')
-          for img in json.load(open('platform.images.json')):
-              tag = f"{acr}/{slug}/{img['name']}:{sha}"
-              target = img.get('deploy', '')
-              if target == 'web':
-                  subprocess.run(['az', 'containerapp', 'update', '-g', rg, '-n', f'{slug}-web', '--image', tag, '-o', 'none'], check=True)
-                  summary.write(f'- web: `{tag}`\n')
-              elif target.startswith('job:'):
-                  job = f"{slug}-{target[4:]}"
-                  exists = subprocess.run(['az', 'containerapp', 'job', 'show', '-g', rg, '-n', job, '-o', 'none'], capture_output=True).returncode == 0
-                  if not exists:
-                      print(f'::warning::job {job} is not provisioned (add it to apps/{slug}/main.bicepparam); image {tag} pushed only')
-                      continue
-                  subprocess.run(['az', 'containerapp', 'job', 'update', '-g', rg, '-n', job, '--image', tag, '-o', 'none'], check=True)
-                  summary.write(f'- {job}: `{tag}`\n')
-          EOF
+      - name: Update the app and jobs (images + platform.app.json)
+        # One update per component: image, resources, scale or schedule, env (platform.app.json plus the
+        # capability settings from infra/app.bicep). Without platform.app.json, images only.
+        run: python3 .github/platform/deliver.py apply
 
       - name: Record delivery (catalog tags)
         run: |
