@@ -31,16 +31,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: SDK version (global.json sdk.version, else the latest .NET 11)
         id: sdk
         run: |
           v=$(python3 -c "import json; print(json.load(open('global.json')).get('sdk',{}).get('version',''))" 2>/dev/null || true)
           echo "version=${v:-11.0.x}" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ steps.sdk.outputs.version }}
-          dotnet-quality: preview
+          dotnet-quality: ${{ endsWith(steps.sdk.outputs.version, '.x') && 'preview' || '' }}   # only for the 11.0.x fallback; an exact global.json SDK needs none
       - name: Test
         # A solution at the root (.sln or .slnx) is tested; without one, tests are skipped with a visible warning
         # (e.g. non-.NET apps). 'ls a b' fails when either pattern matches nothing, so compgen is used per pattern.
@@ -61,12 +61,12 @@ jobs:
       RG: ${{ vars.APP_RESOURCE_GROUP }}
       SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # deliver.py reads the previously delivered platform.app.json (removed settings)
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
