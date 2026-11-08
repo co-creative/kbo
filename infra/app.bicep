@@ -6,7 +6,7 @@
 //   az storage file upload --auth-mode login --enable-file-backup-request-intent \
 //     --account-name <storage account> --share-name <share> --path <path> --source <file>
 
-module resources 'br:crcocreative.azurecr.io/bicep/app-resources:1.0.0' = {
+module resources 'br:crcocreative.azurecr.io/bicep/app-resources:1.1.0' = {
   name: 'app-resources-module'
   params: {
     slug: 'kbo'
