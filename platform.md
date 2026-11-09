@@ -74,6 +74,19 @@ web apps or jobs, change identities, or touch anything outside `rg-kbo`.
 | Signed-in user | Easy Auth header `X-MS-CLIENT-PRINCIPAL` (when the app uses `auth: entra`) |
 | Component | `PLATFORM_COMPONENT` = `web` or `job`; `APP_SLUG` = `kbo` |
 
+### Private NuGet packages (GitHub Packages)
+
+Packages from the `co-creative` GitHub Packages feed (for example the design system `CoCreative.UI`) restore with
+the workflow's own token, no personal tokens:
+
+- `nuget.config` adds `https://nuget.pkg.github.com/co-creative/index.json` with username `co-creative` and
+  password `%NUGET_AUTH_TOKEN%` (`ClearTextPassword`); the test step sets `NUGET_AUTH_TOKEN`.
+- The Dockerfile restores with the BuildKit secret `github_token`:
+  `RUN --mount=type=secret,id=github_token NUGET_AUTH_TOKEN="$(cat /run/secrets/github_token)" dotnet restore`.
+- Each package grants this repository read access (package settings, *Manage Actions access*; an organization
+  owner does this once per package and repository).
+- Locally: `gh auth refresh -s read:packages`, then set `NUGET_AUTH_TOKEN` to `gh auth token` in your shell.
+
 ### Capability settings (environment variables, never secrets)
 
 | Capability | Variables |
