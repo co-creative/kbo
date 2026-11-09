@@ -1,0 +1,22 @@
+name: kbo
+version: 1.0.0
+description: Agent context for kbo (co-creative platform app)
+# Owned by this repository: add packages your app needs. The platform proposes harness upgrades by pull request.
+targets:
+- claude
+- codex
+- copilot
+- opencode
+dependencies:
+  apm:
+  - co-creative/agent-harness#v0.2.0
+  mcp:
+  - name: microsoft-learn
+    registry: false
+    transport: http
+    url: https://learn.microsoft.com/api/mcp
+  - name: azure
+    registry: false
+    transport: stdio
+    command: npx
+    args: ['-y', '@azure/mcp@latest', 'server', 'start', '--read-only']

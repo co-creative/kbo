@@ -1,0 +1,13 @@
+schema: spec-driven
+
+# Project context, shown to agents when they create change artifacts.
+context: |
+  App kbo on the co-creative platform: Belgian enterprise (KBO Open Data) lookup: API and web UI
+  Rules: see AGENTS.md (no secrets, managed identity, ownership split with the platform, main is production).
+  Platform capabilities are specified in co-creative/platform (openspec/specs); record any dependency on a
+  platform change in the proposal.
+
+rules:
+  proposal:
+    - State cost impact (the platform budget is EUR 10/month), security impact and non-goals.
+    - Name any platform change needed (component, ceiling, sign-in, hostname).

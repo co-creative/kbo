@@ -21,6 +21,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  packages: read   # private NuGet packages from the co-creative GitHub Packages feed (e.g. CoCreative.UI)
 
 concurrency:
   # Deliveries run one at a time and are never cancelled; pull request runs are per PR and superseded by newer pushes.
@@ -42,6 +43,10 @@ jobs:
           dotnet-version: ${{ steps.sdk.outputs.version }}
           dotnet-quality: ${{ endsWith(steps.sdk.outputs.version, '.x') && 'preview' || '' }}   # only for the 11.0.x fallback; an exact global.json SDK needs none
       - name: Test
+        # Private packages: a nuget.config with the co-creative GitHub Packages feed reads %NUGET_AUTH_TOKEN%
+        # (the workflow token, read-only; the package must grant this repository Actions access).
+        env:
+          NUGET_AUTH_TOKEN: ${{ github.token }}
         # A solution at the root (.sln or .slnx) is tested; without one, tests are skipped with a visible warning
         # (e.g. non-.NET apps). 'ls a b' fails when either pattern matches nothing, so compgen is used per pattern.
         run: |
@@ -81,6 +86,10 @@ jobs:
         run: python3 .github/platform/deliver.py validate
 
       - name: Build images
+        # The workflow token is offered to the build as BuildKit secret 'github_token' (never a build arg or layer):
+        #   RUN --mount=type=secret,id=github_token NUGET_AUTH_TOKEN="$(cat /run/secrets/github_token)" dotnet restore
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'EOF'
           import json, os, subprocess
@@ -90,6 +99,7 @@ jobs:
               cmd = ['docker', 'build', '-f', img.get('dockerfile', 'Dockerfile'), '-t', tag]
               if img.get('target'):
                   cmd += ['--target', img['target']]
+              cmd += ['--secret', 'id=github_token,env=GITHUB_TOKEN']
               cmd.append(img.get('context', '.'))
               subprocess.run(cmd, check=True)
           EOF

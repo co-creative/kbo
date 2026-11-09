@@ -1,0 +1,5 @@
+{
+  "env": {
+    "AZURE_MCP_COLLECT_TELEMETRY": "false"
+  }
+}

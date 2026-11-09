@@ -1,0 +1,21 @@
+{
+  "mcp": {
+    "microsoft-learn": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
+    "azure": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "npx",
+        "-y",
+        "@azure/mcp@latest",
+        "server",
+        "start",
+        "--read-only"
+      ]
+    }
+  }
+}
