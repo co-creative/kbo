@@ -1239,7 +1239,7 @@ deployments:
   owners:
   - .
   active_owner: .
-  content_hash: sha256:3d6837839a1387081b9c34f13ff811cd0f4399c5c77558e01cd5040f692691ba
+  content_hash: sha256:f95f89fc7ef79652b096dadbf33c46abafe1bae166ca1bf813f734c6ecc781e1
 - kind: project-relative
   target: claude
   value: .claude/rules/co-creative.md
@@ -5883,7 +5883,7 @@ deployments:
   owners:
   - .
   active_owner: .
-  content_hash: sha256:c79348f6050ae9f32c0dad60fbed6fd29979a392c89156c4a3cb3ca1afd1a70e
+  content_hash: sha256:ac85b93b4083deb7fd96f9376751cefd513214a2aa78e57ae0c07f902e54231b
 - kind: project-relative
   target: copilot
   value: .github/instructions/co-creative.instructions.md
@@ -6092,5 +6092,5 @@ local_deployed_files:
 - .claude/rules/app.md
 - .github/instructions/app.instructions.md
 local_deployed_file_hashes:
-  .claude/rules/app.md: sha256:3d6837839a1387081b9c34f13ff811cd0f4399c5c77558e01cd5040f692691ba
-  .github/instructions/app.instructions.md: sha256:c79348f6050ae9f32c0dad60fbed6fd29979a392c89156c4a3cb3ca1afd1a70e
+  .claude/rules/app.md: sha256:f95f89fc7ef79652b096dadbf33c46abafe1bae166ca1bf813f734c6ecc781e1
+  .github/instructions/app.instructions.md: sha256:ac85b93b4083deb7fd96f9376751cefd513214a2aa78e57ae0c07f902e54231b
