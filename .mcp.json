@@ -9,7 +9,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@azure/mcp@latest",
+        "@azure/mcp@3.0.0",
         "server",
         "start",
         "--read-only"
