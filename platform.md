@@ -67,8 +67,9 @@ web apps or jobs, change identities, or touch anything outside `rg-kbo`.
 
 | What | How |
 |---|---|
-| Port | HTTP on `8080` (`ASPNETCORE_HTTP_PORTS`), TLS terminated by the platform; `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` is set, so the app sees `https` and the client IP |
-| Health | `GET /health` returns 200 **as soon as the process runs, also without data or capabilities** (first deployment, empty share, paused database). Probes, the CI contract check and smoke tests depend on it. Report missing data in the app itself (for example a 503 or a "no data yet" page), never by failing to start |
+| Port (web) | HTTP on `8080` (`ASPNETCORE_HTTP_PORTS`), TLS terminated by the platform; `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` is set, so the app sees `https` and the client IP |
+| Health (web) | `GET /health` returns 200 **as soon as the process runs, also without data or capabilities** (first deployment, empty share, paused database). Probes, the CI contract check and smoke tests depend on it. Report missing data in the app itself (for example a 503 or a "no data yet" page), never by failing to start |
+| Jobs | No port or health endpoint: a job runs once and exits; exit code 0 marks the execution succeeded, non-zero failed. It is stopped after `replicaTimeout` seconds (`platform.app.json`) |
 | Identity | User-assigned managed identity; client ID in `AZURE_CLIENT_ID`. Use `ManagedIdentityCredential` in Azure, `DefaultAzureCredential` locally |
 | Telemetry | OpenTelemetry to Application Insights via `APPLICATIONINSIGHTS_CONNECTION_STRING` |
 | Signed-in user | Easy Auth header `X-MS-CLIENT-PRINCIPAL` (when the app uses `auth: entra`) |
