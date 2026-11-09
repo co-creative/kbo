@@ -4,9 +4,9 @@ dependencies:
 - repo_url: co-creative/agent-harness
   name: co-creative-agent-harness
   host: github.com
-  resolved_commit: e8651adcd884d2fd3b461253956cc63c53034b56
-  resolved_ref: v0.2.0
-  version: 0.2.0
+  resolved_commit: 8c360e5d4326c79f44513d08126fee277d8c9345
+  resolved_ref: v0.2.1
+  version: 0.2.1
   package_type: apm_package
   deployed_files:
   - .agents/skills/co-creative-coding
@@ -56,14 +56,14 @@ dependencies:
     .agents/skills/co-creative-coding/references/testing.md: sha256:72109d71e81ed61bf857ba8c68ff818795895766e4392b5a8f0b2e28cbdf7cb3
     .agents/skills/co-creative-platform/SKILL.md: sha256:4eb2eae43b34a2af33a22ff941cd2f19e1c92c0c6c037a61758ed120bcc3fee1
     .agents/skills/co-creative-platform/references/configuration.md: sha256:0a3e7282c144eb6ba6f9d90dfb5afdf96a6ed754459bdda795c9e4f99d8bcbc4
-    .agents/skills/co-creative-platform/references/contract.md: sha256:c0d0d26e2e95e2aef30a81703c6afdd23e394caf768d394f597dfcdbc9cc0c6c
+    .agents/skills/co-creative-platform/references/contract.md: sha256:bfa5dbc1f0eae8a6fe8c14377701c8ebc0f548f69aeff0cc0ae1ae61fb33923a
     .agents/skills/co-creative-platform/references/coordination.md: sha256:828a823ca9481781ddd0d64a7ec88168b7ec25acca5f62b91b345c39497d5d29
     .agents/skills/co-creative-platform/references/delivery.md: sha256:1396363b991068625af35c6a4a601c805a6dd88170c9f70d66bda02f133a073e
     .agents/skills/co-creative-platform/references/ownership.md: sha256:60a32397d1a601a9020d2753c8fc19eb7ccac586452ee77cba7a0eb083513af7
     .agents/skills/co-creative-platform/references/packages.md: sha256:c28c00e97a05e1a1ba11a797ab90fb7ea55cd586961c2bf890e86f44a6d00ff0
     .agents/skills/co-creative-platform/references/static-apps.md: sha256:cd451822da97a72c30a9956f9881c15cfa8355a2aaae7a1cbfbdce9728cb74a2
     .agents/skills/co-creative-specs/SKILL.md: sha256:03e8770a5f11bc153564999bd879a1bb8318757e42249ff41f7fb4f23a27b4c5
-    .claude/rules/co-creative.md: sha256:d239c5e5ab183219090dcab44b66a395ba7d88ea68f72975be8c532e2a792943
+    .claude/rules/co-creative.md: sha256:b442d0be1b56433cd3c6f789ea20a526f62aacf610f460cece27e6be013bf22d
     .claude/skills/co-creative-coding/SKILL.md: sha256:5c8f75400997300c9b6a30a84f911ea6bd58f1367ff85f3c809b5080dcf4ac09
     .claude/skills/co-creative-coding/references/architecture.md: sha256:b9d8137b44e16281e2ec8dec3b15bd75d581366fb6ded8f1978524e504cb0a32
     .claude/skills/co-creative-coding/references/csharp.md: sha256:611a7ca259d2f61458d196f68ab72e5492cfe5d6001e3bb741b92ac5e35a486a
@@ -72,15 +72,15 @@ dependencies:
     .claude/skills/co-creative-coding/references/testing.md: sha256:72109d71e81ed61bf857ba8c68ff818795895766e4392b5a8f0b2e28cbdf7cb3
     .claude/skills/co-creative-platform/SKILL.md: sha256:4eb2eae43b34a2af33a22ff941cd2f19e1c92c0c6c037a61758ed120bcc3fee1
     .claude/skills/co-creative-platform/references/configuration.md: sha256:0a3e7282c144eb6ba6f9d90dfb5afdf96a6ed754459bdda795c9e4f99d8bcbc4
-    .claude/skills/co-creative-platform/references/contract.md: sha256:c0d0d26e2e95e2aef30a81703c6afdd23e394caf768d394f597dfcdbc9cc0c6c
+    .claude/skills/co-creative-platform/references/contract.md: sha256:bfa5dbc1f0eae8a6fe8c14377701c8ebc0f548f69aeff0cc0ae1ae61fb33923a
     .claude/skills/co-creative-platform/references/coordination.md: sha256:828a823ca9481781ddd0d64a7ec88168b7ec25acca5f62b91b345c39497d5d29
     .claude/skills/co-creative-platform/references/delivery.md: sha256:1396363b991068625af35c6a4a601c805a6dd88170c9f70d66bda02f133a073e
     .claude/skills/co-creative-platform/references/ownership.md: sha256:60a32397d1a601a9020d2753c8fc19eb7ccac586452ee77cba7a0eb083513af7
     .claude/skills/co-creative-platform/references/packages.md: sha256:c28c00e97a05e1a1ba11a797ab90fb7ea55cd586961c2bf890e86f44a6d00ff0
     .claude/skills/co-creative-platform/references/static-apps.md: sha256:cd451822da97a72c30a9956f9881c15cfa8355a2aaae7a1cbfbdce9728cb74a2
     .claude/skills/co-creative-specs/SKILL.md: sha256:03e8770a5f11bc153564999bd879a1bb8318757e42249ff41f7fb4f23a27b4c5
-    .github/instructions/co-creative.instructions.md: sha256:00b65c5145bc0b7cdaa68e2f5248bc3e2d01e53d687b0d568cc9b4d9a9530d6b
-  content_hash: sha256:9909e66539d8ea834e1406e3ad614ad6707bfe5d6cfa228a9e1c9c02828980b3
+    .github/instructions/co-creative.instructions.md: sha256:f136c9319c71a211bca5d8a6d0dea40ce47ba0bffd25f630b917e50d5ab75aee
+  content_hash: sha256:a25e4e447876b24770330900332a2510bb8c2cea01e12a6f0321677bd1e5623c
   declared_license: MIT
 - repo_url: dotnet/skills
   name: dotnet-aspnetcore
@@ -1248,7 +1248,7 @@ deployments:
   owners:
   - co-creative/agent-harness
   active_owner: co-creative/agent-harness
-  content_hash: sha256:d239c5e5ab183219090dcab44b66a395ba7d88ea68f72975be8c532e2a792943
+  content_hash: sha256:b442d0be1b56433cd3c6f789ea20a526f62aacf610f460cece27e6be013bf22d
 - kind: project-relative
   target: claude
   value: .claude/skills/appinsights-instrumentation
@@ -2184,7 +2184,7 @@ deployments:
   owners:
   - co-creative/agent-harness
   active_owner: co-creative/agent-harness
-  content_hash: sha256:c0d0d26e2e95e2aef30a81703c6afdd23e394caf768d394f597dfcdbc9cc0c6c
+  content_hash: sha256:bfa5dbc1f0eae8a6fe8c14377701c8ebc0f548f69aeff0cc0ae1ae61fb33923a
 - kind: project-relative
   target: claude
   value: .claude/skills/co-creative-platform/references/coordination.md
@@ -4407,7 +4407,7 @@ deployments:
   owners:
   - co-creative/agent-harness
   active_owner: co-creative/agent-harness
-  content_hash: sha256:c0d0d26e2e95e2aef30a81703c6afdd23e394caf768d394f597dfcdbc9cc0c6c
+  content_hash: sha256:bfa5dbc1f0eae8a6fe8c14377701c8ebc0f548f69aeff0cc0ae1ae61fb33923a
 - kind: project-relative
   target: codex
   value: .agents/skills/co-creative-platform/references/coordination.md
@@ -5892,7 +5892,7 @@ deployments:
   owners:
   - co-creative/agent-harness
   active_owner: co-creative/agent-harness
-  content_hash: sha256:00b65c5145bc0b7cdaa68e2f5248bc3e2d01e53d687b0d568cc9b4d9a9530d6b
+  content_hash: sha256:f136c9319c71a211bca5d8a6d0dea40ce47ba0bffd25f630b917e50d5ab75aee
 - kind: uri
   target: mcp
   value: azure

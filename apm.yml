@@ -9,7 +9,7 @@ targets:
 - opencode
 dependencies:
   apm:
-  - co-creative/agent-harness#v0.2.0
+  - co-creative/agent-harness#v0.2.1
   mcp:
   - name: microsoft-learn
     registry: false

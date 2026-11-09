@@ -20,8 +20,10 @@ subscription, budget €10/month for the base platform). The platform itself liv
    platform: never edit them.
 3. **`main` (or `master`) is production.** Every push deploys. Changing `platform.app.json` or `infra/app.bicep` is
    a production change: say so before doing it, and prefer a pull request (its build runs the tests).
-4. **Keep the runtime contract** (see `platform.md`): HTTP on port 8080, `GET /health` returns 200 as soon as the
-   process runs (also without data), no command/args overrides, one Dockerfile target per component.
+4. **Keep the runtime contract** (see `platform.md`): one Dockerfile target per component, no command/args
+   overrides. The **web** component serves HTTP on port 8080 and `GET /health` returns 200 as soon as the process
+   runs (also without data). **Jobs** have no port or health endpoint: they run once and exit, with exit code 0 for
+   success; a non-zero exit marks the execution failed.
 5. **Spec first for material changes.** New features, behaviour changes and architecture decisions go through the
    spec-driven workflow (`openspec/`), before code.
 
