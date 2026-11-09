@@ -149,7 +149,7 @@ Empty values are omitted from the JSON.
    - write `current.txt` last;
    - delete releases older than the previous one;
    - move the zip to `incoming/processed/`.
-6. **Rollback** means editing `current.txt`. The web app reads it at startup, so it takes effect on the next cold start, or immediately via a revision restart.
+6. **Rollback** means editing `current.txt`. The web app checks it at most once a minute (`Kbo:CheckInterval`) and swaps in the release it names, so a rollback, like a new release, takes effect within a minute without a restart.
 
 **Job size:** 4 vCPU / 8 GiB (consumption maximum, 8 GiB ephemeral disk). Peak RAM is estimated at 3–5 GB and **must be measured in the spike**. If it doesn't fit, sort-merge per entity number instead of holding everything in memory.
 
@@ -157,7 +157,7 @@ Empty values are omitted from the JSON.
 
 ### 7.1 Query layer: `CompanyStore` (singleton)
 
-- **At startup:** (or, when there is no release yet, on the first request after it appears: the app must start and answer `/health` without data) read `current.txt` and open `Data Source=file:<share>/kbo-<n>.db?immutable=1;Mode=ReadOnly` (URI support to be confirmed in the spike). Then load `code` into a `CodeBook` and read `release`.
+- **At startup:** (or, when there is no release yet, on the first request after it appears: the app must start and answer `/health` without data) read `current.txt` and open `Data Source=file:<share>/kbo-<n>.db?immutable=1;Mode=ReadOnly` (URI support to be confirmed in the spike). Then load `code` into a `CodeBook` and read `release`. While running, re-read `current.txt` on demand at most once a minute; when it names another file, open it and swap the store (decided 2026-11-09 with the platform: app-side, because a job-triggered revision restart would need Container Apps write rights for the runtime identity).
 - **`Get(KboNr)`:** one primary-key read. The document is projected to the requested language through `CodeBook` (fallback order: requested → NL → FR → any).
 - **`Search(SearchQuery, skip, take)`:** a `MATCH` query ordered by `bm25(company_fts, 5, 1, 4, 2.5, 0.5)` (name, street, city, postal code, activity), returning summaries. `take` is capped at 25. Sort and limit inside the FTS subquery, then join `company` for only those rows (3–4× faster, §11).
 - **Term modes:** each term is matched as a prefix if its prefix expansion is narrow enough (index entries ≤ 10% of companies, read from `company_fts_vocab` and stopping as soon as the limit is passed). Otherwise it is matched as an exact word if *that* is narrow: `co` is in 10k companies, while `co*` covers 6M index entries. Otherwise it is **common** (`de`, `van`). Common free-text terms are dropped when other terms remain. If only common terms remain, they are matched exactly and returned unranked with a "too broad" hint. Without a prefix index, expanding `de*`, `ge*` or `co*` costs 0.5–2.5 s, while exact `"de"` costs 0.2 ms (§11).

@@ -226,6 +226,13 @@ public sealed class CompanyStore
         return false;
     }
 
+    /// <summary>Closes this release's idle pooled connections (and those returned later), e.g. after switching to a newer release.</summary>
+    public void ClearPool()
+    {
+        using var con = new SqliteConnection(connectionString);
+        SqliteConnection.ClearPool(con);
+    }
+
     private SqliteConnection OpenConnection()
     {
         var con = new SqliteConnection(connectionString);

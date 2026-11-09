@@ -68,7 +68,7 @@ dotnet run --project Net.Code.Kbo.Web            # or: dotnet run --project kbo.
 
 ## Web app notes
 
-- **No release yet:** the app starts without one (platform contract: `/health` answers 200 with no data). `ReleaseProvider.Current` is then null and opening is retried on demand, at most every `Kbo:RetryInterval` (10 s). Meanwhile the API returns 503 problem details (`NoReleaseException`) and `MainLayout` shows "No data yet" instead of the page. Once open, a release is kept until the next start.
+- **No release yet:** the app starts without one (platform contract: `/health` answers 200 with no data). `ReleaseProvider.Current` is then null and opening is retried on demand, at most every `Kbo:RetryInterval` (10 s). Meanwhile the API returns 503 problem details (`NoReleaseException`) and `MainLayout` shows "No data yet" instead of the page. Once a release is open, `current.txt` is checked again on demand, at most every `Kbo:CheckInterval` (1 min). When it names another file (a new release or a rollback), that file is opened and swapped in; if it can't be opened, the open release is kept.
 
 - **Language:** `?lang=nl|fr` in the query string; anything else falls back to nl. `code.csv` only has NL and FR descriptions. `CompanyView`/`SummaryView` (`Net.Code.Kbo/Views.cs`) resolve codes for both the API and the UI.
 - **Not found:**

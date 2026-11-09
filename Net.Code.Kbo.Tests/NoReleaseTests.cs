@@ -37,4 +37,35 @@ public class NoReleaseTests
         await Assert.That((await client.GetAsync("/api/release")).StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(await client.GetStringAsync("/?q=acme")).Contains(KboFixture.Acme);
     }
+
+    [Test]
+    public async Task SwitchesToANewRelease_AndBackOnRollback()
+    {
+        using var share = new TempDirectory();
+        var work = Path.Combine(share.Path, "work");
+        var validation = new ValidationOptions { MaxOrphanFraction = 1 };
+        KboFixture.CreateZip(Path.Combine(share.Path, "incoming"), 502);
+        await Assert.That(Releaser.Run(share.Path, work, validation, _ => { })).IsEqualTo(0);
+
+        await using var factory = new WebApplicationFactory<Net.Code.Kbo.Web.Components.App>().WithWebHostBuilder(web => web
+            .UseEnvironment("Testing")
+            .UseSetting("Kbo:Database", null)
+            .UseSetting("Kbo:Share", share.Path)
+            .UseSetting("Kbo:CheckInterval", "00:00:00")
+            .UseSetting("Kbo:CommonTermFraction", "0.4"));
+        using var client = factory.CreateClient();
+        await Assert.That(await client.GetStringAsync("/api/release")).Contains("\"extractNumber\":502");
+
+        KboFixture.CreateZip(Path.Combine(share.Path, "incoming"), 503);
+        await Assert.That(Releaser.Run(share.Path, work, validation, _ => { })).IsEqualTo(0);
+        await Assert.That(await client.GetStringAsync("/api/release")).Contains("\"extractNumber\":503");
+
+        // a broken current.txt keeps the open release
+        await File.WriteAllTextAsync(Path.Combine(share.Path, Releaser.CurrentFile), "kbo-9999.db");
+        await Assert.That(await client.GetStringAsync("/api/release")).Contains("\"extractNumber\":503");
+
+        await File.WriteAllTextAsync(Path.Combine(share.Path, Releaser.CurrentFile), "kbo-0502.db");
+        await Assert.That(await client.GetStringAsync("/api/release")).Contains("\"extractNumber\":502");
+        await Assert.That(await client.GetStringAsync("/?q=acme")).Contains(KboFixture.Acme);
+    }
 }
