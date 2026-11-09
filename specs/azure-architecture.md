@@ -266,7 +266,7 @@ Consequences for the design (applied in §5–§7):
 
 ## 12. Risks, open questions, upgrade paths
 
-- **Q1, licence:** check the KBO Open Data terms for redistributing the data through a public API or UI. This decides when built-in auth can be turned off.
+- **Q1, licence (resolved 2026-11-09):** the KBO Open Data terms allow redistributing the data through a public API or UI. Built-in auth stays on anyway (owner's decision).
 - **Q2, SMB latency:** Azure Files latency for search on common words. Fallback: copy the db to local disk at startup and keep minimum replicas at 1 (≈ €35+/month).
 - **Q3, NACE versions (decided 2026-11-05):** the document keeps the newest version per (entity, group, classification); the search index keeps the descriptions of all versions. See §5.
 - **Q4, URI filenames (resolved):** Microsoft.Data.Sqlite accepts `Data Source=file:<path>?immutable=1;Mode=ReadOnly` (spike).
