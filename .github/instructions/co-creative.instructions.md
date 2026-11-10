@@ -36,6 +36,7 @@ subscription, budget €10/month for the base platform). The platform itself liv
   design system `CoCreative.UI`. Look there before building something reusable; publish code there when two or
   more apps need it (`CoCreative.*` names). See skill co-creative-platform, packages.
 - Skill **co-creative-coding**: architecture and coding guidelines (C#/.NET, Blazor, tests).
+- Skill **co-creative-ui**: the design system for any UI work (components, tokens, page patterns, don'ts).
 - Skill **co-creative-specs**: the spec-driven workflow with OpenSpec.
 - .NET skills (`csharp-expert`, `csharp-refactoring`, `dotnet-webapi`, Blazor, EF Core, testing, .NET 11) and Azure
   skills (`azure-*`): use them for their topics instead of guessing APIs.
