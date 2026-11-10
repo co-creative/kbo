@@ -3,7 +3,7 @@ name: co-creative-platform
 description: "The co-creative platform model for app repositories: what the app owns vs. what the platform owns, the runtime contract, delivery, configuration (platform.app.json), own Azure resources (infra/app.bicep), static apps, the co-creative NuGet feed for reusable packages, and how to request platform changes. WHEN: changing settings, scale, schedules, Azure resources, Dockerfile, health endpoint, deployment, hostnames, sign-in, or anything touching Azure; before writing reusable code (look for a package) or when sharing code between apps (publish one); when a task needs something the app can't do itself."
 metadata:
   author: co-creative
-  version: "0.3.2"
+  version: "0.4.0"
 ---
 
 # co-creative platform
