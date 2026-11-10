@@ -15,6 +15,9 @@
       ],
       "id": "",
       "command": "npx",
+      "env": {
+        "AZURE_TOKEN_CREDENTIALS": "${AZURE_TOKEN_CREDENTIALS}"
+      },
       "args": [
         "-y",
         "@azure/mcp@3.0.0",

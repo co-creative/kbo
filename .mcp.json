@@ -13,7 +13,10 @@
         "server",
         "start",
         "--read-only"
-      ]
+      ],
+      "env": {
+        "AZURE_TOKEN_CREDENTIALS": "AzureCliCredential"
+      }
     }
   }
 }
