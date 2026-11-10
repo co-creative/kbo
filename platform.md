@@ -63,6 +63,14 @@ web apps or jobs, change identities, or touch anything outside `rg-kbo`.
 - `deploy`: `web`, or `job:<name>` for a job defined in the app definition.
 - **Each image's `ENTRYPOINT` defines what it runs.** The platform never sets command or arguments.
 
+### Delivery flow (`.co-creative.yml`)
+
+`.co-creative.yml` at the repository root is owned by this repository and tells coding agents how to deliver:
+`delivery: push` (the default, also when the file or key is missing: run the tests locally, push to `main`, watch
+the deploy), `pr-auto` (pull request, merged by the agent once CI passes) or `pr-review` (pull request, a person
+merges). Every flow runs the tests locally before pushing. A direct push in a `pr-*` repository still deploys; the
+deploy shows a warning that the commit didn't come from a merged pull request.
+
 ## Runtime contract
 
 | What | How |
