@@ -14,12 +14,13 @@ subscription, budget €10/month for the base platform). The platform itself liv
    the app's managed identity (`AZURE_CLIENT_ID`; `ManagedIdentityCredential` in Azure, `DefaultAzureCredential`
    locally). If something seems to need a secret, stop and ask: the platform probably offers a keyless way.
 2. **Respect the ownership split.** This repository owns its code, `platform.app.json` (settings, scale, schedules)
-   and `infra/app.bicep` (its own storage, SQL, Service Bus, SignalR). The platform owns which components exist,
-   sign-in, hostnames, DNS, mounts, AI and the ceilings. Platform-owned files here (`platform.md`,
-   `.github/workflows/platform-deploy.yml`, `.github/platform/*`) change only through pull requests from the
-   platform: never edit them.
-3. **`main` (or `master`) is production.** Every push deploys. Changing `platform.app.json` or `infra/app.bicep` is
-   a production change: say so before doing it, and prefer a pull request (its build runs the tests).
+   and `infra/app.bicep` (its own storage, SQL, Service Bus, SignalR) and `.co-creative.yml` (its delivery flow).
+   The platform owns which components exist, sign-in, hostnames, DNS, mounts, AI and the ceilings. Platform-owned
+   files here (`platform.md`, `.github/workflows/platform-deploy.yml`, `.github/platform/*`) change only through the
+   platform's syncs: never edit them.
+3. **`main` (or `master`) is production.** Every push deploys after the CI tests pass. Run the tests locally before
+   every push and follow the repository's delivery flow (`.co-creative.yml`, default `push`; see the delivery
+   rules). Changing `platform.app.json` or `infra/app.bicep` is a production change: say so before doing it.
 4. **Keep the runtime contract** (see `platform.md`): one Dockerfile target per component, no command/args
    overrides. The **web** component serves HTTP on port 8080 and `GET /health` returns 200 as soon as the process
    runs (also without data). **Jobs** have no port or health endpoint: they run once and exit, with exit code 0 for

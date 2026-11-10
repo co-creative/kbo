@@ -1,5 +1,9 @@
 # Delivery
 
+How changes reach the default branch (push, `pr-auto` or `pr-review`) is the repository's choice in
+`.co-creative.yml`; the delivery rules (`co-creative-delivery`) describe each flow. Whatever the flow, run the tests
+locally before every push.
+
 `.github/workflows/platform-deploy.yml` (platform-owned):
 
 **Pull requests:** the test job only. Nothing is built, pushed or deployed.

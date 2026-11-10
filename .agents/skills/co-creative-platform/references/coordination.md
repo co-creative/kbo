@@ -17,8 +17,8 @@ working with the same operator.
 - If a platform session is reachable (cross-session messaging), message it: state the app, what you need, why, and
   the evidence (run URL, error text). Keep the first line self-contained.
 - Otherwise open an issue in `co-creative/platform`, or ask the operator.
-- Platform changes to this repository arrive as pull requests (`platform/onboard`, `platform/sync`). Review them
-  like any PR: check the diff, let the PR build run, then merge when the operator allows it.
+- Platform changes to this repository arrive as platform syncs (`infra/scripts/sync-app-repo.ps1`). If one breaks
+  the build or contradicts this repository, tell the platform; don't patch platform-owned files yourself.
 
 ## Etiquette
 

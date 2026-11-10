@@ -6,6 +6,7 @@ the guardrails around it.
 | The app repository owns (change it here) | The platform owns (ask the platform) |
 |---|---|
 | Code, tests, Dockerfile(s), `platform.images.json` | Which components exist: the web app, job names and their trigger type |
+| `.co-creative.yml`: the delivery flow (`push`, `pr-auto`, `pr-review`) | |
 | `platform.app.json`: env settings, CPU/memory, replicas, job schedules and timeouts (container apps); build, test, output and API (static apps) | Sign-in (`auth: entra`, Easy Auth), user/group access |
 | `infra/app.bicep`: its own storage (blobs, queues, tables, file shares), SQL free database, Service Bus queues, SignalR Free | Hostnames, DNS, certificates |
 | `staticwebapp.config.json` (static apps) | File-share mounts on the shared environment |
@@ -16,7 +17,7 @@ the guardrails around it.
 ## Platform-owned files in this repository
 
 `platform.md`, `.github/workflows/platform-deploy.yml`, `.github/platform/deliver.py`,
-`.github/platform/platform.app.schema.json`. They're updated by platform pull requests (`platform/sync` branch).
+`.github/platform/platform.app.schema.json`. They're updated only by the platform's syncs.
 Don't edit them; if they're wrong, tell the platform (see coordination.md).
 
 ## What the app's CI identity can and can't do

@@ -3,7 +3,7 @@ name: co-creative-platform
 description: "The co-creative platform model for app repositories: what the app owns vs. what the platform owns, the runtime contract, delivery, configuration (platform.app.json), own Azure resources (infra/app.bicep), static apps, the co-creative NuGet feed for reusable packages, and how to request platform changes. WHEN: changing settings, scale, schedules, Azure resources, Dockerfile, health endpoint, deployment, hostnames, sign-in, or anything touching Azure; before writing reusable code (look for a package) or when sharing code between apps (publish one); when a task needs something the app can't do itself."
 metadata:
   author: co-creative
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # co-creative platform
@@ -31,4 +31,4 @@ each app in `apps/<slug>/main.bicepparam`; the app repository owns its code and 
    (caches, Data Protection keys) doesn't survive.
 4. The app can manage resources only inside its own resource group `rg-<slug>`, within platform policies (allowed
    resource types, free SQL only, no storage keys).
-5. Platform-owned files in this repository change only through platform pull requests.
+5. Platform-owned files in this repository change only through the platform's syncs.
