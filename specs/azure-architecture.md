@@ -270,6 +270,7 @@ Consequences for the design (applied in §5–§7):
 - **Q2, SMB latency:** Azure Files latency for search on common words. Fallback: copy the db to local disk at startup and keep minimum replicas at 1 (≈ €35+/month).
 - **Q3, NACE versions (decided 2026-11-05):** the document keeps the newest version per (entity, group, classification); the search index keeps the descriptions of all versions. See §5.
 - **Q4, URI filenames (resolved):** Microsoft.Data.Sqlite accepts `Data Source=file:<path>?immutable=1;Mode=ReadOnly` (spike).
+- **Q6, release pickup without a restart (open, added 2026-11-10):** since 1fdb2fe the web app re-reads `current.txt` at most once a minute and swaps releases. Covered by `NoReleaseTests`, but not yet seen in Azure: on the next monthly release (after 0538), check that `kbo-web` serves the new extract within a minute of the job publishing it, without a revision restart, and record it in §11.
 - **Q5, FAX contacts (decided 2026-11-05):** `code.csv` has no `FAX` contact type, so the 19,428 FAX rows are skipped. Validation counts them as expected rejections.
 - **Upgrade path, more traffic:** set min replicas to 1 or more and use a local db copy.
 - **Upgrade path, better search:** Azure AI Search. The job also pushes flattened search fields to a new index per release and flips an index alias (aliases are GA in API version 2026-04-01). Full documents stay where they are, in the SQLite file or in Blob. Don't use Table Storage: bpost's document is larger than Table's 64 KiB property limit.
