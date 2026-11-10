@@ -16,8 +16,8 @@ subscription, budget €10/month for the base platform). The platform itself liv
 2. **Respect the ownership split.** This repository owns its code, `platform.app.json` (settings, scale, schedules)
    and `infra/app.bicep` (its own storage, SQL, Service Bus, SignalR) and `.co-creative.yml` (its delivery flow).
    The platform owns which components exist, sign-in, hostnames, DNS, mounts, AI and the ceilings. Platform-owned
-   files here (`platform.md`, `.github/workflows/platform-deploy.yml`, `.github/platform/*`) change only through the
-   platform's syncs: never edit them.
+   files here (`platform.md`, `.github/workflows/platform-deploy.yml`, `.github/platform/*`) change only through
+   `platform/sync` pull requests, which the platform merges itself: never edit them.
 3. **`main` (or `master`) is production.** Every push deploys after the CI tests pass. Run the tests locally before
    every push and follow the repository's delivery flow (`.co-creative.yml`, default `push`; see the delivery
    rules). Changing `platform.app.json` or `infra/app.bicep` is a production change: say so before doing it.

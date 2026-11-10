@@ -17,7 +17,7 @@ the guardrails around it.
 ## Platform-owned files in this repository
 
 `platform.md`, `.github/workflows/platform-deploy.yml`, `.github/platform/deliver.py`,
-`.github/platform/platform.app.schema.json`. They're updated only by the platform's syncs.
+`.github/platform/platform.app.schema.json`. They're updated only by `platform/sync` pull requests, which the platform merges itself.
 Don't edit them; if they're wrong, tell the platform (see coordination.md).
 
 ## What the app's CI identity can and can't do
