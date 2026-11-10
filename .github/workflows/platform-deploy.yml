@@ -21,6 +21,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  pull-requests: read   # delivery flow check: was the delivered commit a merged pull request?
   packages: read   # private NuGet packages from the co-creative GitHub Packages feed (e.g. CoCreative.UI)
 
 concurrency:
@@ -69,6 +70,22 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # deliver.py reads the previously delivered platform.app.json (removed settings)
+
+      - name: Delivery flow check (.co-creative.yml)
+        # pr-auto and pr-review repositories deliver merged pull requests. A direct push still deploys, with a warning.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flow=$(grep -oE '^delivery:[[:space:]]*[a-z-]+' .co-creative.yml 2>/dev/null | head -1 | sed -E 's/^delivery:[[:space:]]*//')
+          case "${flow:-push}" in
+            pr-auto|pr-review)
+              merged=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '[.[] | select(.merged_at != null)] | length' 2>/dev/null || echo unknown)
+              if [ "$merged" = "0" ]; then
+                echo "::warning::.co-creative.yml says 'delivery: $flow', but ${{ github.sha }} is a direct push, not a merged pull request (deployed anyway)"
+              elif [ "$merged" = "unknown" ]; then
+                echo "::warning::Could not check whether ${{ github.sha }} came from a merged pull request"
+              fi ;;
+          esac
 
       - name: Azure login (OIDC)
         uses: azure/login@v3

@@ -1,0 +1,4 @@
+# Repository conventions for coding agents and CI. Owned by this repository.
+# delivery: push (test locally, push to main, CI deploys) | pr-auto (pull request, merged by the agent when CI
+# passes) | pr-review (pull request, a person merges). A direct push in a pr-* repository still deploys, with a warning.
+delivery: push
