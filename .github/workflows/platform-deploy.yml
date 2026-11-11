@@ -42,7 +42,6 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ steps.sdk.outputs.version }}
-          dotnet-quality: ${{ endsWith(steps.sdk.outputs.version, '.x') && 'preview' || '' }}   # only for the 11.0.x fallback; an exact global.json SDK needs none
       - name: Test
         # Private packages: a nuget.config with the co-creative GitHub Packages feed reads %NUGET_AUTH_TOKEN%
         # (the workflow token, read-only; the package must grant this repository Actions access).
