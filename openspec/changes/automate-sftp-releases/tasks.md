@@ -25,5 +25,6 @@
 - [ ] 4.2 Measure end-to-end resource use and cost against the job's limits and platform budget; do not enable incremental publication until equivalence and capacity gates pass.
 - [ ] 4.3 Configure the proposed monthly schedule and enable incremental publication only after the platform secret contract and gates are ready.
 - [ ] 4.4 Update `specs/azure-architecture.md` with the revised design, cadence, rollback procedure and measurements; run the repository test suite.
-- [ ] 4.5 Agree the username/password JSON payload with the operator; enroll the secret and redeploy to establish the scoped grant.
+- [x] 4.5 Agree the username/password JSON payload with the operator; enroll the secret and redeploy to establish the scoped grant.
 - [ ] 4.6 Verify a fresh production ingestion, a new credential version on a subsequent execution, and denied secret access from the web identity.
+  - Production execution `kbo-build-shdhx77` published extract 0545 on 2026-11-15. Rotation and an actual denied read from the web identity remain to be verified.

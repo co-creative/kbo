@@ -261,6 +261,7 @@ Spike on 2026-11-05: a single-file streaming build of extract 0502 straight from
 | Azure Files latency, cold start | ? | not measurable from a laptop; measure in phase 3 |
 | **Azure job `kbo-build` (4 vCPU / 8 GiB, build on local ephemeral disk)** | | **5.1 min end to end** (load 46 s, write 3 min, optimize 40 s, validate 23 s, copy to share 22 s); 3.41 GB peak RAM; 4.31 GB file; 187/190 names found. Building **on the SMB share fails**: SQLite gets "database is locked" (no byte-range locks), so the work directory must be local. |
 | **Azure job, extract 0538 (first monthly release, 2026-11-08)** | | **6.5 min end to end** (load 46 s, write 3.1 min, optimize 1.9 min, validate 25 s, copy to share 19 s); 3.41 GB peak RAM; 4.31 GB file, 1,975,903 companies; 185/195 names found. The web app picked it up after a revision restart. |
+| **Azure job, SFTP extract 0545 (2026-11-15)** | | **7 min 35 s end to end** including credential retrieval and SFTP download; the processed archive and `current.txt` confirm publication. Web pickup without a restart has not yet been verified. |
 
 Consequences for the design (applied in §5–§7):
 - **No prefix index:** it costs 1.8 GB and 40% of build time to save about 0.1 s on broad one-word prefixes.

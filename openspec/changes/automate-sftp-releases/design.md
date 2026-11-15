@@ -20,7 +20,7 @@ Use SFTP, not FTP/FTPS, and the `opendata` directory. Parse exact Full and Updat
 
 The independently confirmed ED25519 SHA-256 host-key fingerprint is `SHA256:LcC2+VnBH01X/CGMd44inc/lxMJy/jH1RtwhW9PIGD8`. Reject unknown or changed keys. Retrieve the latest version of the mapped secret once per run using the platform's dedicated job identity and `PLATFORM_SECRETS_*` contract. Neither passwords nor secret-bearing connection strings belong in settings, arguments or logs.
 
-The proposed atomic payload is a JSON object with exactly two string properties: `username` and `password`. It supports password and a single password-prompt keyboard-interactive exchange, matching the observed FPS login. The operator must agree this format before enrolling it, and enter the actual JSON only at the platform script's hidden prompt. Reject disabled, expired, not-yet-valid and malformed credentials; never fall back to an older version.
+The agreed atomic payload is a JSON object with exactly two string properties: `username` and `password`. It supports password and a single password-prompt keyboard-interactive exchange, matching the observed FPS login. The operator enters the actual JSON only at the platform script's hidden prompt. Reject disabled, expired, not-yet-valid and malformed credentials; never fall back to an older version.
 
 ```json
 {"username":"<KBO username>","password":"<KBO password>"}
