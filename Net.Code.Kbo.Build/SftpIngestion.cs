@@ -71,26 +71,137 @@ static partial class SftpIngestion
         string share, string workDirectory, ValidationOptions validation,
         Func<CancellationToken, Task<SftpCredential>> getCredential,
         Func<SftpCredential, ISftpSource> createSource,
-        Action<string> log, CancellationToken cancellationToken)
+        Action<string> log, CancellationToken cancellationToken,
+        TimeProvider? timeProvider = null, bool incrementalEnabled = false)
     {
         var credential = await getCredential(cancellationToken);
         using var lease = Releaser.AcquireLease(share);
         using var source = createSource(credential);
         log("Connecting to KBO SFTP.");
         await source.ConnectAsync(cancellationToken);
-        log("Listing KBO Full extracts.");
+        log("Listing KBO extracts.");
         var files = await source.ListAsync(cancellationToken);
-        var candidate = SelectNewest(files, Releaser.CurrentExtract(share));
+        var current = Releaser.CurrentExtract(share);
+        var candidate = SelectNewest(files, current);
         if (candidate is null)
         {
             log("No newer Full extract is available.");
+            if (incrementalEnabled && SourceBinding.Open(share, current, log, cancellationToken) is { } existing)
+                Releaser.PruneReleases(share, current, existing.PreviousExtract, log);
             return 0;
         }
 
-        var incoming = Path.Combine(share, "incoming");
-        Directory.CreateDirectory(incoming);
-        var temporary = Path.Combine(incoming, $".sftp-{Guid.NewGuid():N}.part");
-        var destination = Path.Combine(incoming, candidate.Name);
+        var match = FullName().Match(candidate.Name);
+        var target = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+        var month = (timeProvider ?? TimeProvider.System).GetUtcNow().ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        if (!incrementalEnabled)
+            return await PublishFullAsync(source, candidate, share, workDirectory, validation, month, log, cancellationToken);
+        var binding = SourceBinding.Open(share, current, log, cancellationToken);
+        if (binding is null || binding.FullMonth != month)
+        {
+            if (binding is not null && binding.FullMonth != month)
+                log("A monthly Full rebuild is due.");
+            return await PublishFullAsync(source, candidate, share, workDirectory, validation, month, log, cancellationToken);
+        }
+        var chain = SelectUpdates(files, current, target);
+        if (chain is null)
+        {
+            log("The Update chain is incomplete; using a Full extract.");
+            return await PublishFullAsync(source, candidate, share, workDirectory, validation, month, log, cancellationToken);
+        }
+
+        Directory.CreateDirectory(workDirectory);
+        var run = Path.Combine(workDirectory, "ingest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(run);
+        var downloads = new List<string>();
+        var state = Path.Combine(run, "source.zip");
+        var database = Path.Combine(run, "release.db");
+        try
+        {
+            foreach (var update in chain)
+            {
+                var path = Path.Combine(run, update.Name);
+                await DownloadAsync(source, update, path, log, cancellationToken);
+                downloads.Add(path);
+            }
+
+            var oldSource = SourceBinding.PathFor(share, current);
+            IncrementalChanges changes;
+            try
+            {
+                changes = IncrementalState.Apply(oldSource, downloads, state, cancellationToken);
+            }
+            catch (SourceIncompatibleException)
+            {
+                log("The source snapshot or Update format is incompatible; using a Full extract.");
+                return await PublishFullAsync(source, candidate, share, workDirectory, validation, month, log, cancellationToken);
+            }
+            if (changes.CodesChanged)
+            {
+                log("The codebook changed; using a Full extract.");
+                return await PublishFullAsync(source, candidate, share, workDirectory, validation, month, log, cancellationToken);
+            }
+            IncrementalRelease.Build(oldSource, state, Path.Combine(share, Releaser.FileName(current)),
+                database, changes, log, cancellationToken);
+            var next = new SourceBinding(target, SourceBinding.HashFile(state, cancellationToken), binding.FullMonth, current);
+            SourceBinding.Write(database, next);
+            if (Validator.Validate(database, validation, log, target).Count > 0) return 1;
+            IncrementalPublisher.Publish(share, database, state, next, log, cancellationToken);
+            return 0;
+        }
+        finally
+        {
+            foreach (var path in downloads) if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(state)) File.Delete(state);
+            if (File.Exists(database)) File.Delete(database);
+            Directory.Delete(run);
+        }
+    }
+
+    private static async Task<int> PublishFullAsync(
+        ISftpSource source, RemoteExtract candidate, string share, string workDirectory,
+        ValidationOptions validation, string month, Action<string> log, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(workDirectory);
+        var run = Path.Combine(workDirectory, "full-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(run);
+        var destination = Path.Combine(run, candidate.Name);
+        var database = Path.Combine(run, "release.db");
+        try
+        {
+            await DownloadAsync(source, candidate, destination, log, cancellationToken);
+            var expected = int.Parse(FullName().Match(candidate.Name).Groups[1].Value, CultureInfo.InvariantCulture);
+            using (var extract = new Extract(destination))
+            {
+                var meta = extract.Read<MetaRow>("meta.csv").ToDictionary(r => r.Variable, r => r.Value);
+                if (meta.GetValueOrDefault("ExtractType") != "full" ||
+                    !int.TryParse(meta.GetValueOrDefault("ExtractNumber"), NumberStyles.None,
+                        CultureInfo.InvariantCulture, out var number) || number != expected)
+                    throw new InvalidDataException("The Full archive metadata does not match its filename.");
+            }
+            log("Download complete; starting Full build.");
+            ReleaseBuilder.Build(destination, database, log);
+            var next = new SourceBinding(expected, SourceBinding.HashFile(destination, cancellationToken),
+                month, Releaser.CurrentExtract(share));
+            SourceBinding.Write(database, next);
+            if (Validator.Validate(database, validation, log, expected).Count > 0) return 1;
+            cancellationToken.ThrowIfCancellationRequested();
+            IncrementalPublisher.Publish(share, database, destination, next, log, cancellationToken);
+            return 0;
+        }
+        finally
+        {
+            if (File.Exists(database)) File.Delete(database);
+            if (File.Exists(destination)) File.Delete(destination);
+            Directory.Delete(run);
+        }
+    }
+
+    private static async Task DownloadAsync(
+        ISftpSource source, RemoteExtract candidate, string destination, Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        var temporary = Path.Combine(Path.GetDirectoryName(destination)!, $".sftp-{Guid.NewGuid():N}.part");
         try
         {
             log($"Downloading {candidate.Name}.");
@@ -101,23 +212,17 @@ static partial class SftpIngestion
                 if (candidate.Length <= 0 || stream.Length != candidate.Length)
                     throw new IOException("The extract transfer was incomplete.");
             }
-
             using (var zip = ZipFile.OpenRead(temporary))
                 if (!zip.Entries.Any(e => e.FullName == "meta.csv"))
-                    throw new InvalidDataException("The downloaded archive is not a Full extract.");
-
+                    throw new InvalidDataException("The downloaded archive has no metadata.");
             cancellationToken.ThrowIfCancellationRequested();
             if (File.Exists(destination))
             {
                 if (!await SameContentAsync(temporary, destination, cancellationToken))
-                    throw new IOException("A different incoming archive already has this name.");
+                    throw new IOException("A different archive already has this name.");
             }
             else
                 File.Move(temporary, destination);
-
-            cancellationToken.ThrowIfCancellationRequested();
-            log("Download complete; starting release validation.");
-            return Releaser.RunWhileLeased(share, workDirectory, validation, log);
         }
         finally
         {
@@ -147,6 +252,31 @@ static partial class SftpIngestion
         return matches[0].File;
     }
 
+    internal static IReadOnlyList<RemoteExtract>? SelectUpdates(IEnumerable<RemoteExtract> files, int current, int target)
+    {
+        if (current < 1 || target <= current) return null;
+        var updates = new Dictionary<int, RemoteExtract>();
+        foreach (var file in files)
+        {
+            var match = UpdateName().Match(file.Name);
+            if (!match.Success ||
+                !int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var number) ||
+                !DateOnly.TryParseExact(match.Groups[2].Value, "yyyy_MM_dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out _) || number <= current || number > target)
+                continue;
+            if (!updates.TryAdd(number, file))
+                throw new InvalidDataException("Multiple Updates have the same extract number.");
+        }
+        var result = new List<RemoteExtract>();
+        for (var number = current + 1; ; number++)
+        {
+            if (!updates.TryGetValue(number, out var update)) return null;
+            result.Add(update);
+            if (number == target) break;
+        }
+        return result;
+    }
+
     private static async Task<bool> SameContentAsync(string first, string second, CancellationToken cancellationToken)
     {
         await using var a = File.OpenRead(first);
@@ -159,4 +289,7 @@ static partial class SftpIngestion
 
     [GeneratedRegex(@"\AKboOpenData_(\d+)_(\d{4}_\d{2}_\d{2})_Full\.zip\z", RegexOptions.CultureInvariant)]
     private static partial Regex FullName();
+
+    [GeneratedRegex(@"\AKboOpenData_(\d+)_(\d{4}_\d{2}_\d{2})_Update\.zip\z", RegexOptions.CultureInvariant)]
+    private static partial Regex UpdateName();
 }

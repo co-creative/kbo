@@ -14,7 +14,7 @@ The current documents discard older NACE versions while the search index uses th
 
 ### Scheduled job and SFTP
 
-Use the existing `build` job and its configurable cron schedule, proposing `0 6 1 * *` (monthly, UTC) initially. A daily schedule can be selected without a code change. Keep the existing manual release entry point independent of SFTP.
+Use the existing `build` job on a daily configurable UTC schedule. Produce an incremental release from consecutive Updates between Full rebuilds; perform a Full rebuild in each calendar month when a newer extract is available, and earlier if recovery requires it. Keep the existing manual release entry point independent of SFTP.
 
 Use SFTP, not FTP/FTPS, and the `opendata` directory. Parse exact Full and Update filename patterns and compare extract numbers, not timestamps. Discover and apply all required intermediate updates; never infer a complete chain solely from a date. Verify the provider's documented sequence and Update semantics against the cookbook and real files before implementation.
 
@@ -34,9 +34,13 @@ Keep a durable, versioned, lossless source state sufficient to reproduce the Ful
 
 The exact staging schema must preserve duplicate and multi-row semantics. Legacy import code is a reference for investigation, not an authority or a reusable production dependency. A Full rebuild remains the recovery path for a missing chain, expired baseline, incompatible state version or unsupported transition.
 
+The baseline is a compressed ZIP containing the source tables, codebook and metadata. Merge sorted source rows with each ordered Update's deletes and complete replacement rows. Reconstruct old and new affected enterprises, including their original search text, to delete and reinsert their contentless FTS rows in an unpublished local database copy. A changed codebook triggers a Full rebuild. Automatic Full downloads use local scratch space; their bound source snapshot is retained on the share, without accumulating a separate processed archive. The independent manual flow retains its existing archive handling.
+
 ### Publish and recovery
 
 Associate each durable state snapshot with its exact extract and release. Persist a complete new state and validated database under new names before switching `current.txt`; a crash before or after the switch must leave a matching state or cause a Full rebuild, never reuse mismatched state. Retain the current and previous release for rollback. A rollback to a release without compatible retained state triggers Full recovery before further incremental work. The next scheduled automatic run may publish a newer release again; pause the job schedule when a rollback must remain in effect.
+
+Each database records the snapshot hash, most recent Full-build UTC month and previous extract. Publication validates the snapshot hash and switches the pointer last; a subsequent idle run completes interrupted retention cleanup. Existing immutable targets are reused only when their binding matches exactly.
 
 Serialize the entire release operation across scheduled, manual and retried runs using exclusive creation of `.release.lock` on the share. If a process crashes and leaves the lock behind, the operator must confirm that no release run is active before removing that specific lock file. Never reclaim it automatically based only on age. Temporary downloads and incomplete work are isolated and cleaned up safely; retain only bounded state and archives required for recovery.
 
@@ -56,7 +60,7 @@ Alternatives considered: rebuilding from Full every run is simpler and remains t
 
 ## Migration Plan
 
-1. Deploy Full-only SFTP acquisition with the proposed monthly schedule and retain the independent manual Full path. Until enrollment and the scoped grant, scheduled ingestion fails closed and leaves the current release untouched.
+1. Deploy Full-only SFTP acquisition and retain the independent manual Full path. Until enrollment and the scoped grant, scheduled ingestion fails closed and leaves the current release untouched.
 2. Agree the credential payload with the operator; enroll the secret with the platform's `infra\scripts\set-app-secret.ps1` and redeploy KBO to establish its scoped read grant. Verify a fresh job, rotation and denied web-identity access.
 3. Verify Update semantics and benchmark a representative real chain; seed a baseline from Full and enable incremental publication only after its equivalence and capacity gates pass.
 4. On failure, use the manual Full path; point `current.txt` to the retained previous release if rollback is needed. Pause scheduled publication to keep a rollback in effect. Existing release files are immutable and cannot be overwritten.

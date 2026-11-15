@@ -53,8 +53,13 @@ static async Task<int> Ingest(string share, string workDirectory)
 
         try
         {
+            var value = Environment.GetEnvironmentVariable("KBO_INCREMENTAL_ENABLED");
+            if (!string.IsNullOrEmpty(value) && !bool.TryParse(value, out _))
+                throw new InvalidDataException("KBO_INCREMENTAL_ENABLED must be true or false.");
+            var incrementalEnabled = bool.TryParse(value, out var enabled) && enabled;
             return await SftpIngestion.RunAsync(share, workDirectory, new ValidationOptions(),
-                _ => Task.FromResult(credential), c => new FpsSftpSource(c), ConsoleLog.Write, cancellation.Token);
+                _ => Task.FromResult(credential), c => new FpsSftpSource(c), ConsoleLog.Write, cancellation.Token,
+                incrementalEnabled: incrementalEnabled);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

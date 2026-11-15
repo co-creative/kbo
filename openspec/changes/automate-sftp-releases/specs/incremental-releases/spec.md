@@ -4,6 +4,17 @@ Produce correct immutable releases from consecutive KBO Update extracts, with re
 
 ## ADDED Requirements
 
+### Requirement: Daily updates and monthly Full rebuilds
+The system SHALL check daily for new extracts and perform a Full rebuild in each UTC calendar month when a newer extract is available. Between Full rebuilds it SHALL use a complete compatible Update chain, subject to the recovery requirements below.
+
+#### Scenario: First newer extract of a month
+- **WHEN** a newer extract is available and no Full rebuild has been published in the current UTC calendar month
+- **THEN** the system builds and publishes a Full release
+
+#### Scenario: No newer extract
+- **WHEN** no extract newer than the current release is available
+- **THEN** the system leaves the current release unchanged
+
 ### Requirement: Apply a complete update chain
 The system SHALL apply the required consecutive KBO Update extracts in their defined order to a compatible baseline, including insertions and deletions, to produce a release for the selected target extract.
 

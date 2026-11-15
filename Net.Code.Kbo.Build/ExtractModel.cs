@@ -112,7 +112,18 @@ sealed class ExtractModel
         pool.TrimExcess();
     }
 
-    public IEnumerable<BuiltCompany> Companies()
+    public HashSet<long> AffectedCompanies(IncrementalChanges changes)
+    {
+        var result = new HashSet<long>(changes.EnterpriseOwners);
+        foreach (var number in changes.Entities)
+            if (EntityNumber.IsEnterprise(number)) result.Add(number);
+        foreach (var (enterprise, children) in units)
+            if (children.Any(unit => changes.Entities.Contains(unit.Number)))
+                result.Add(enterprise);
+        return result;
+    }
+
+    public IEnumerable<BuiltCompany> Companies(IReadOnlySet<long>? selection = null)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         var streets = new HashSet<string>(StringComparer.Ordinal);
@@ -121,9 +132,10 @@ sealed class ExtractModel
         var nace = new HashSet<int>();
         var activityText = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var number in enterprises.Keys.Order())
+        IEnumerable<long> selected = selection is null ? enterprises.Keys : selection;
+        foreach (var number in selected.Order())
         {
-            var e = enterprises[number];
+            if (!enterprises.TryGetValue(number, out var e)) continue;
             var self = entities.GetValueOrDefault(number);
             var myUnits = units.GetValueOrDefault(number) ?? [];
 

@@ -5,7 +5,7 @@ Acquire KBO extracts securely and automatically for the existing release pipelin
 ## ADDED Requirements
 
 ### Requirement: Scheduled acquisition
-The system SHALL use the configurable build-job schedule to check the KBO SFTP directory for new extracts. The proposed initial schedule is monthly; changing the schedule SHALL NOT require a code change.
+The system SHALL use a configurable daily build-job schedule to check the KBO SFTP directory for new extracts. Changing the schedule SHALL NOT require a code change.
 
 #### Scenario: Newer Full extract available
 - **WHEN** a scheduled run needs a Full extract and one newer than the published extract is available

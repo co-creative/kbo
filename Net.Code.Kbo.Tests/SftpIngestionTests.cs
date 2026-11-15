@@ -64,9 +64,10 @@ public class SftpIngestionTests
     }
 
     [Test]
-    public async Task RunAsync_FixtureDownloadPublishesReleaseAndProcessesArchive()
+    public async Task RunAsync_FixtureDownloadPublishesReleaseAndDiscardsAutomaticArchive()
     {
         using var share = new TempDirectory();
+        using var scratch = new TempDirectory();
         var zip = CreateFixtureBytes(502);
         var source = new FakeSftpSource([new RemoteExtract(FixtureName(502), zip.Length)], zip);
         SftpCredential? suppliedCredential = null;
@@ -75,7 +76,7 @@ public class SftpIngestionTests
         {
             suppliedCredential = credential;
             return source;
-        });
+        }, workDirectory: scratch.Path);
 
         await Assert.That(exitCode).IsEqualTo(0);
         await Assert.That(File.ReadAllText(Path.Combine(share.Path, Releaser.CurrentFile))).IsEqualTo("kbo-0502.db");
@@ -83,8 +84,11 @@ public class SftpIngestionTests
         await Assert.That(source.DownloadedNames).IsEquivalentTo(new[] { FixtureName(502) });
         await Assert.That(source.Disposed).IsTrue();
         await Assert.That(suppliedCredential?.Username).IsEqualTo("unit-test-user");
-        await Assert.That(File.Exists(Path.Combine(share.Path, "incoming", "processed", FixtureName(502)))).IsTrue();
-        await Assert.That(Directory.GetFiles(Path.Combine(share.Path, "incoming"), ".sftp-*.part").Length).IsEqualTo(0);
+        await Assert.That(Directory.Exists(Path.Combine(share.Path, "incoming"))).IsFalse();
+        await Assert.That(File.Exists(SourceBinding.PathFor(share.Path, 502))).IsTrue();
+        await Assert.That(Directory.Exists(scratch.Path)
+            ? Directory.GetFiles(scratch.Path, "*.zip", SearchOption.AllDirectories).Length
+            : 0).IsEqualTo(0);
     }
 
     [Test]
@@ -293,15 +297,20 @@ public class SftpIngestionTests
     public async Task RunAsync_ValidationFailurePreservesCurrentRelease()
     {
         using var share = new TempDirectory();
+        using var scratch = new TempDirectory();
         var baseline = SeedCurrentRelease(share, 501);
         var zip = CreateFixtureBytes(502);
         var source = new FakeSftpSource([new RemoteExtract(FixtureName(502), zip.Length)], zip);
 
-        var exitCode = await RunAsync(share, source, validation: Lenient with { MaxBytes = 1 });
+        var exitCode = await RunAsync(
+            share, source, validation: Lenient with { MaxBytes = 1 }, workDirectory: scratch.Path);
 
         await AssertPreserved(share, baseline);
         await Assert.That(exitCode).IsEqualTo(1);
-        await Assert.That(File.Exists(Path.Combine(share.Path, "incoming", FixtureName(502)))).IsTrue();
+        await Assert.That(File.Exists(Path.Combine(share.Path, "incoming", FixtureName(502)))).IsFalse();
+        await Assert.That(Directory.Exists(scratch.Path)
+            ? Directory.GetFiles(scratch.Path, "*.zip", SearchOption.AllDirectories).Length
+            : 0).IsEqualTo(0);
         await Assert.That(source.Disposed).IsTrue();
     }
 
@@ -321,9 +330,10 @@ public class SftpIngestionTests
     }
 
     [Test]
-    public async Task RunAsync_ExistingDifferentIncomingArchivePreservesCurrentRelease()
+    public async Task RunAsync_ExistingManualIncomingArchiveIsNotTouchedByAutomaticFull()
     {
         using var share = new TempDirectory();
+        using var scratch = new TempDirectory();
         var baseline = SeedCurrentRelease(share, 501);
         var incoming = Path.Combine(share.Path, "incoming");
         Directory.CreateDirectory(incoming);
@@ -332,12 +342,19 @@ public class SftpIngestionTests
         var zip = CreateFixtureBytes(502);
         var source = new FakeSftpSource([new RemoteExtract(FixtureName(502), zip.Length)], zip);
 
-        var error = await CaptureAsync(() => RunAsync(share, source));
+        var exitCode = await RunAsync(share, source, workDirectory: scratch.Path);
 
-        await AssertPreserved(share, baseline);
-        await Assert.That(error?.GetType()).IsEqualTo(typeof(IOException));
+        await Assert.That(exitCode).IsEqualTo(0);
+        await Assert.That(File.ReadAllText(Path.Combine(share.Path, Releaser.CurrentFile)))
+            .IsEqualTo("kbo-0502.db");
+        await Assert.That(HashFile(Path.Combine(share.Path, baseline.Current))).IsEqualTo(baseline.DatabaseHash);
         await Assert.That(File.ReadAllText(candidatePath)).IsEqualTo("existing content");
+        await Assert.That(source.DownloadedNames).IsEquivalentTo(new[] { FixtureName(502) });
+        await Assert.That(File.Exists(SourceBinding.PathFor(share.Path, 502))).IsTrue();
         await Assert.That(Directory.GetFiles(incoming, ".sftp-*.part").Length).IsEqualTo(0);
+        await Assert.That(Directory.Exists(scratch.Path)
+            ? Directory.GetFiles(scratch.Path, "*.zip", SearchOption.AllDirectories).Length
+            : 0).IsEqualTo(0);
     }
 
     [Test]
@@ -358,11 +375,12 @@ public class SftpIngestionTests
         TempDirectory share,
         FakeSftpSource source,
         Func<SftpCredential, ISftpSource>? sourceFactory = null,
-        ValidationOptions? validation = null)
+        ValidationOptions? validation = null,
+        string? workDirectory = null)
     {
         return await SftpIngestion.RunAsync(
             share.Path,
-            Path.Combine(share.Path, "work"),
+            workDirectory ?? Path.Combine(share.Path, "work"),
             validation ?? Lenient,
             _ => Task.FromResult(new SftpCredential("unit-test-user", "unit-test-password-only")),
             sourceFactory ?? (_ => source),

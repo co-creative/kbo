@@ -20,7 +20,7 @@ Supersedes: `pipeline-overview.md`, `company-json-cache.md`, `fts5-plan.md`, `cl
   The largest enterprise, bpost, has 1,060 establishments. 33 enterprises have 200 or more, and 240 have between 50 and 199.
 - **Usage:** read-only lookups and search. There's one user for now (low traffic), with possible commercial use later.
 - **Priorities:** simplicity first, then low running cost. Backward compatibility isn't required.
-- **Freshness:** Full extracts are available daily. The scheduled job initially builds monthly; the schedule is configurable. **There is no incremental import yet**; the proposed Update-file path is tracked in `openspec/changes/automate-sftp-releases`.
+- **Freshness:** the job checks daily for new extracts. With incremental processing enabled, consecutive Updates are applied between monthly Full rebuilds; the schedule remains configurable.
 
 ## 2. Decisions
 
@@ -30,7 +30,7 @@ Supersedes: `pipeline-overview.md`, `company-json-cache.md`, `fts5-plan.md`, `cl
 | D2 | The API and UI open that file **directly from an Azure Files share** (read-only, `immutable=1`) | Nothing is downloaded at startup, so the app can scale to zero, and there's no per-replica disk limit. Network latency is fine at this traffic level (to be measured, §11). |
 | D3 | **One web app** hosts both the JSON API (`/api/...`) and the Blazor UI | One image, one Container App, one deployment. The UI calls the query layer in-process, not over HTTP. |
 | D4 | The Blazor UI uses **static server-side rendering** (no interactive mode) | No SignalR circuits or WebAssembly payload. Works with scale-to-zero, plain GET forms give shareable URLs, and pages work without JavaScript. |
-| D5 | **Full rebuild on the configured schedule** in a Container Apps job | The initial monthly schedule controls cost; incremental processing remains a separate proposed change. |
+| D5 | **Daily Updates and monthly Full rebuilds** in the existing Container Apps job | Fresh data without a Full build every day; an incompatible baseline or missing chain falls back to Full. |
 | D6 | The build is **streaming C#**: CSVs are read straight from the zip and turned into documents in memory, then written in one pass | No staging database, no large SQL CTEs (the last approach exhausted RAM), and plain code that's easy to unit test. |
 | D7 | Documents store **codes, not descriptions**; descriptions come from a small `code` table loaded into memory | Avoids repeating 4-language NACE text in 2M documents. Languages are resolved per request. |
 | D8 | Search is **SQLite FTS5**. Typo tolerance comes later via `fts5vocab` plus edit distance (§7.3) | No extra service. Azure AI Search stays an upgrade path (§12). |
@@ -39,15 +39,16 @@ Supersedes: `pipeline-overview.md`, `company-json-cache.md`, `fts5-plan.md`, `cl
 ## 3. Architecture
 
 ```
-  KBO SFTP ──download Full ZIP────────────────►│ Storage account                                     │
+  KBO SFTP ──Full / Update ZIPs──► build job ─►│ Storage account                                     │
                                                │ (manual uploads remain supported)                   │
                                                │   Azure Files share "kbo"                           │
                                                │     incoming/KboOpenData_0502_..._Full.zip          │
                                                │     kbo-0502.db   kbo-0501.db   current.txt         │
+                                               │     .state/source-0502.zip, source-0501.zip           │
                                                │          ▲ write (rw mount)       ▲ read (ro mount) │
                                                │          │                        │                 │
                                                │ Container Apps environment (Consumption only)       │
-                                               │   Job  "kbo-build"  cron monthly, 4 vCPU / 8 GiB    │
+                                               │   Job  "kbo-build"  cron daily, 4 vCPU / 8 GiB      │
                                                │   App  "kbo-web"    0.5 vCPU / 1 GiB, min 0         │
                                                │          ├─ /            Blazor (static SSR)        │
                                                │          ├─ /api/...     minimal API                │
@@ -133,7 +134,7 @@ Empty values are omitted from the JSON.
 
 ## 6. Build and release (`Net.Code.Kbo.Build`)
 
-1. **Find work.** The scheduled job retrieves its credential and selects the highest-numbered Full ZIP newer than `current.txt` from KBO SFTP `opendata`. It verifies the pinned SSH host key, downloads to a temporary file and checks the transfer before exposing the ZIP to the pipeline. If none is newer, exit 0. `kbo release` remains available for a manual upload without SFTP.
+1. **Find work.** The scheduled job retrieves its credential and selects the highest-numbered Full ZIP newer than `current.txt` from KBO SFTP `opendata`. It verifies the pinned SSH host key, downloads to an isolated local temporary file and checks the transfer before processing. If none is newer, exit 0. `kbo release` remains available for a manual upload without SFTP.
 2. **Load into memory,** reading CSV entries straight from the zip (no extraction):
    - load `code` and `meta`;
    - load enterprises, establishments, branches, denominations, addresses and contacts into dictionaries keyed by entity number;
@@ -145,15 +146,16 @@ Empty values are omitted from the JSON.
    - smoke queries, such as known numbers like bpost `0214.596.464` and searches like `colruyt halle`;
    - file size is under 6 GB (the job has 8 GiB of disk; 0502 is 4.46 GB).
 5. **Publish:**
-   - copy the file to the share as `kbo-<extract>.db.tmp`, then rename it to a new `kbo-<extract>.db` without overwriting an existing immutable release;
+   - stage the source snapshot and validated database on the share under new extract-specific names, checking the snapshot hash and never overwriting an incompatible immutable release;
    - write `current.txt` last;
-   - delete releases older than the previous one;
-   - move the zip to `incoming/processed/`.
+   - retain the current and previous databases and associated source snapshots; the manual flow moves its zip to `incoming/processed/`.
 6. **Rollback** means editing `current.txt`. The web app checks it at most once a minute (`Kbo:CheckInterval`) and swaps in the release it names. Pause scheduled publication to keep a rollback in effect; an existing immutable release is never overwritten.
 
 The job reads `PLATFORM_SECRETS_VAULT_URI`, `PLATFORM_SECRETS_CLIENT_ID` and `PLATFORM_SECRETS_NAMES`, then uses the dedicated job identity to retrieve the latest mapped `sftp-credential` Key Vault secret once per run. It validates metadata and an atomic JSON object containing exactly `username` and `password`, without persisting or logging either value. The operator must agree the payload format, enroll it using the platform's hidden-input script, and redeploy KBO once to establish the scoped grant. Later rotations use the same secret name: enroll the new version, verify a fresh job, then coordinate revocation of the previous provider credential. A disabled or invalid latest version never causes fallback to an older version. Do not enter real credentials in source control, configuration, commands or chat.
 
-An exclusive `.release.lock` in the share prevents concurrent manual and scheduled releases. If a crashed job leaves it behind, confirm no release run is active before removing that specific lock file. ZIPs move to `incoming/processed/`; monitor share capacity and manage retention deliberately.
+**Incremental path:** a Full release seeds a lossless compressed source snapshot, bound to the database by its SHA-256 hash. Apply every consecutive Update's key deletions and complete insertions to a new snapshot. Regenerate affected companies from both snapshots, including the original search text needed to delete contentless FTS rows, in a local copy of the current database. A changed codebook, missing chain or incompatible state triggers a Full rebuild. The database records the last Full-build UTC month and prior extract; a new Full is built on the first newer extract of each month. The first run after enabling may need a Full to seed state. `KBO_INCREMENTAL_ENABLED=false` retains Full-only processing.
+
+An exclusive `.release.lock` in the share prevents concurrent manual and scheduled releases. If a crashed job leaves it behind, confirm no release run is active before removing that specific lock file. A later successful or idle run finishes retention cleanup; monitor the 20 GiB share, including manually processed archives, and manage those archives deliberately.
 
 **Job size:** 4 vCPU / 8 GiB (consumption maximum, 8 GiB ephemeral disk). Peak RAM is estimated at 3–5 GB and **must be measured in the spike**. If it doesn't fit, sort-merge per entity number instead of holding everything in memory.
 
@@ -206,11 +208,11 @@ For now, turn on **Container Apps built-in authentication (Entra ID)** for the w
 
 | Resource | Settings |
 |---|---|
-| Resource group | `rg-kbo`, West Europe |
-| Storage account | Standard LRS, hot; Azure Files share `kbo` (about 10 GB quota) |
+| Resource group | `rg-kbo`, Sweden Central |
+| Storage account | Standard LRS, transaction optimized; Azure Files share `kbo` (20 GiB quota) |
 | Container Apps environment | Consumption only (no dedicated workload profile, so no fixed management fee); share registered as SMB storage. SMB mounts authenticate with the account key, which is stored as an environment secret. |
 | Container App `kbo-web` | 0.5 vCPU / 1 GiB, min replicas 0, max 2; share mounted read-only; built-in auth on; HTTP ingress |
-| Container Apps Job `kbo-build` | schedule trigger (first of month, 06:00 UTC), 4 vCPU / 8 GiB, replica timeout 2 h; share mounted read-write; also startable on demand (`az containerapp job start`) |
+| Container Apps Job `kbo-build` | daily schedule trigger, 4 vCPU / 8 GiB, replica timeout 2 h; share mounted read-write; also startable on demand (`az containerapp job start`) |
 | Container Registry | Basic |
 | Log Analytics + Application Insights | OpenTelemetry via ServiceDefaults |
 
@@ -227,6 +229,8 @@ Aspire 13 can publish a project as a Container Apps job and add Azure Files volu
 | Log Analytics | first 5 GB free, then €2.68/GB | €0 |
 | **Total** | | **≈ €5** |
 
+For the daily job, Sweden Central retail rates are $0.000024/vCPU-second and $0.000003/GiB-second. A conservative 31 runs of 10 minutes at 4 vCPU / 8 GiB costs about $2.23/month before the shared free grant. Transaction-optimized Azure Files is $0.06/GB-month and $0.015 per 10,000 writes; the earlier production Full build used about 2,904 writes. Current subscription costs and free-grant use are shared, so this is an estimate, not a budget guarantee. Monitor the actual daily-run and storage charges against the €10 platform budget.
+
 **Reference points when traffic grows:**
 - An always-on replica with a local copy of the database (1.25 vCPU / 2.5 GiB, needed for 8 GiB of disk) costs €35 idle to €124 fully busy.
 - Azure AI Search Basic costs €66 per unit (€132 for 2 units, which the query SLA requires).
@@ -240,7 +244,7 @@ Aspire 13 can publish a project as a Container Apps job and add Azure Files volu
 | **2. Web** ✅ | `Net.Code.Kbo.Web` (API + Blazor SSR), tests via `WebApplicationFactory` | Local `dotnet run` (or the AppHost) serves search and detail pages against a built db; tests are green |
 | **3. Azure** | AppHost resources, `azd up`, first release published by the job | The UI works on Azure behind Entra auth; a job run publishes `kbo-0502.db`; rollback has been tested |
 | **4. Cleanup** | Delete `Net.Code.Kbo.Data`, `.Api`, `.Cli` and the superseded specs; update AGENTS.md and README | The solution builds, tests are green, and no EF Core is left |
-| **5. Optional** | Typo tolerance (§7.3), a typeahead island, incremental KBO updates | as needed |
+| **5. Optional** | Typo tolerance (§7.3), a typeahead island | as needed |
 
 ## 11. Measurements
 
@@ -262,6 +266,9 @@ Spike on 2026-11-05: a single-file streaming build of extract 0502 straight from
 | **Azure job `kbo-build` (4 vCPU / 8 GiB, build on local ephemeral disk)** | | **5.1 min end to end** (load 46 s, write 3 min, optimize 40 s, validate 23 s, copy to share 22 s); 3.41 GB peak RAM; 4.31 GB file; 187/190 names found. Building **on the SMB share fails**: SQLite gets "database is locked" (no byte-range locks), so the work directory must be local. |
 | **Azure job, extract 0538 (first monthly release, 2026-11-08)** | | **6.5 min end to end** (load 46 s, write 3.1 min, optimize 1.9 min, validate 25 s, copy to share 19 s); 3.41 GB peak RAM; 4.31 GB file, 1,975,903 companies; 185/195 names found. The web app picked it up after a revision restart. |
 | **Azure job, SFTP extract 0545 (2026-11-15)** | | **7 min 35 s end to end** including credential retrieval and SFTP download; the processed archive and `current.txt` confirm publication. Web pickup without a restart has not yet been verified. |
+| **Incremental 0544 → 0545, 4-vCPU / 8-GiB Linux container** | | **4 min 52 s** including simulated acquisition, validation and publication; 3,317 MiB peak process RAM and 4,787 MiB peak working files. The source snapshot was 475 MiB, the database 4,312 MiB. SFTP and Azure Files were local simulations, not production network measurements. |
+
+The 0544 → 0545 incremental and Full builds matched all 1,976,355 company documents and summaries, source counts, code rows and 815,860 FTS vocabulary entries; 25 representative searches returned the same ordered results. The live share used 9.30 GiB before this change; one similarly sized staged database and source snapshot would bring usage to approximately 14 GiB before pruning, below its 20 GiB quota.
 
 Consequences for the design (applied in §5–§7):
 - **No prefix index:** it costs 1.8 GB and 40% of build time to save about 0.1 s on broad one-word prefixes.

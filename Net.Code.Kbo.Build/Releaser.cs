@@ -74,12 +74,7 @@ static partial class Releaser
             WriteAtomically(Path.Combine(share, CurrentFile), FileName(candidate.number));
             log($"published {FileName(candidate.number)}");
 
-            // keep the new release and the one before it (for rollback)
-            foreach (var old in Directory.EnumerateFiles(share, "kbo-*.db").Select(p => (p, n: ExtractNumberOfDb(p))).Where(x => x.n > 0).OrderByDescending(x => x.n).Skip(2))
-            {
-                File.Delete(old.p);
-                log($"deleted old release {Path.GetFileName(old.p)}");
-            }
+            PruneReleases(share, candidate.number, current, log);
 
             var processed = Path.Combine(incoming, "processed");
             Directory.CreateDirectory(processed);
@@ -109,10 +104,40 @@ static partial class Releaser
     private static int ExtractNumberOfDb(string dbPath) =>
         DbName().Match(Path.GetFileName(dbPath)) is { Success: true } m ? int.Parse(m.Groups[1].Value) : 0;
 
-    private static void WriteAtomically(string path, string content)
+    internal static void WriteAtomically(string path, string content)
     {
         File.WriteAllText(path + ".tmp", content);
         File.Move(path + ".tmp", path, overwrite: true);
+    }
+
+    internal static void PruneReleases(string share, int current, int previous, Action<string> log)
+    {
+        var releases = Directory.EnumerateFiles(share, "kbo-*.db")
+            .Select(path => (path, number: ExtractNumberOfDb(path)))
+            .Where(x => x.number > 0).ToArray();
+        if (previous == 0)
+            previous = releases.Where(x => x.number != current).Select(x => x.number).DefaultIfEmpty().Max();
+        foreach (var (path, number) in releases.Where(x => x.number != current && x.number != previous))
+        {
+            File.Delete(path);
+            log($"deleted old release {Path.GetFileName(path)}");
+            var source = SourceBinding.PathFor(share, number);
+            if (File.Exists(source)) File.Delete(source);
+        }
+        foreach (var path in Directory.EnumerateFiles(share, "kbo-*.db.tmp"))
+            if (DbTempName().IsMatch(Path.GetFileName(path))) File.Delete(path);
+
+        var stateDirectory = Path.Combine(share, ".state");
+        if (!Directory.Exists(stateDirectory)) return;
+        foreach (var path in Directory.EnumerateFiles(stateDirectory, "source-*.zip"))
+        {
+            var match = SourceName().Match(Path.GetFileName(path));
+            if (match.Success && int.TryParse(match.Groups[1].Value, out var number) &&
+                number != current && number != previous)
+                File.Delete(path);
+        }
+        foreach (var path in Directory.EnumerateFiles(stateDirectory, "source-*.zip.tmp"))
+            if (SourceTempName().IsMatch(Path.GetFileName(path))) File.Delete(path);
     }
 
     [GeneratedRegex(@"^KboOpenData_(\d+)_.*_Full\.zip$", RegexOptions.IgnoreCase)]
@@ -120,4 +145,13 @@ static partial class Releaser
 
     [GeneratedRegex(@"^kbo-(\d+)\.db$")]
     private static partial Regex DbName();
+
+    [GeneratedRegex(@"^source-(\d+)\.zip$")]
+    private static partial Regex SourceName();
+
+    [GeneratedRegex(@"^kbo-\d+\.db\.tmp$")]
+    private static partial Regex DbTempName();
+
+    [GeneratedRegex(@"^source-\d+\.zip\.tmp$")]
+    private static partial Regex SourceTempName();
 }

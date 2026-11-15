@@ -6,7 +6,7 @@ KBO Full extracts are available over SFTP, but the release job currently depends
 
 - Have the existing build job find and download newer Full extracts over SFTP before building and publishing them.
 - Add incremental processing of consecutive KBO Update extracts, with a Full rebuild when a safe incremental chain is unavailable.
-- Make the automatic release cadence configurable using the existing job schedule; propose monthly as the initial setting.
+- Run the existing job daily, applying consecutive Updates between monthly Full rebuilds; retain a configurable schedule.
 - Authenticate with a platform-provided Key Vault integration and verify the independently confirmed SSH host fingerprint.
 - Retain manual uploads, validation, atomic publication and rollback; surface acquisition failures without replacing the current release.
 
@@ -26,5 +26,5 @@ None.
 - Affects `Net.Code.Kbo.Build`, release data/state, its tests, job configuration and `specs/azure-architecture.md`; API and UI contracts are unchanged.
 - Depends on the platform's in-progress Key Vault capability, including runtime identity access and an agreed credential delivery and rotation contract. No new job or ceiling is assumed.
 - SFTP authentication introduces a third-party password. It must not be committed, logged or put in ordinary app settings; the server host key must be verified.
-- Monthly is the proposed initial cadence. More frequent releases, retained incremental state and Key Vault increase compute, storage transactions and potentially storage costs; measure against the EUR 10/month platform budget.
+- Daily releases, retained incremental state and Key Vault increase compute, storage transactions and potentially storage costs; measure against the EUR 10/month platform budget.
 - Non-goals: resurrecting the legacy EF Core projects, changes to company data or search semantics, and platform implementation of Key Vault.
