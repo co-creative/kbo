@@ -15,19 +15,21 @@ sealed record ValidationOptions
 /// <summary>Checks a freshly built release before it is published (specs/azure-architecture.md §6 step 4).</summary>
 static class Validator
 {
-    public static IReadOnlyList<string> Validate(string dbPath, ValidationOptions options, Action<string> log)
+    public static IReadOnlyList<string> Validate(string dbPath, ValidationOptions options, Action<string> log, int? expectedExtract = null)
     {
-        try { return ValidateCore(dbPath, options, log); }
+        try { return ValidateCore(dbPath, options, log, expectedExtract); }
         finally { SqliteConnection.ClearAllPools(); } // release file handles so the database can be copied/deleted
     }
 
-    private static IReadOnlyList<string> ValidateCore(string dbPath, ValidationOptions options, Action<string> log)
+    private static IReadOnlyList<string> ValidateCore(string dbPath, ValidationOptions options, Action<string> log, int? expectedExtract)
     {
         var errors = new List<string>();
         var size = new FileInfo(dbPath).Length;
         if (size > options.MaxBytes) errors.Add($"database is {size:N0} bytes, limit {options.MaxBytes:N0}");
 
         var store = CompanyStore.Open(dbPath);
+        if (expectedExtract is { } expected && store.Release.ExtractNumber != expected)
+            errors.Add("archive extract number does not match its filename");
         var counts = store.Release.Counts;
         long Count(string key) => counts.GetValueOrDefault(key);
 

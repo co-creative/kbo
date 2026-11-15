@@ -22,4 +22,4 @@ FROM mcr.microsoft.com/dotnet/runtime:11.0 AS build
 WORKDIR /app
 COPY --from=publish /out/build .
 USER $APP_UID
-ENTRYPOINT ["dotnet", "kbo.dll", "release", "--share", "/mnt/kbo", "--work", "/tmp/kbo-build"]
+ENTRYPOINT ["dotnet", "kbo.dll", "ingest", "--share", "/mnt/kbo", "--work", "/tmp/kbo-build"]

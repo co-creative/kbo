@@ -17,6 +17,27 @@ static partial class Releaser
     /// <returns>Process exit code: 0 = published or nothing to do, 1 = build or validation failed.</returns>
     public static int Run(string share, string workDirectory, ValidationOptions validation, Action<string> log)
     {
+        using var lease = AcquireLease(share);
+        return RunWhileLeased(share, workDirectory, validation, log);
+    }
+
+    internal static IDisposable AcquireLease(string share)
+    {
+        var path = Path.Combine(share, ".release.lock");
+        return new ReleaseLease(path, new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None));
+    }
+
+    private sealed class ReleaseLease(string path, FileStream stream) : IDisposable
+    {
+        public void Dispose()
+        {
+            stream.Dispose();
+            File.Delete(path);
+        }
+    }
+
+    internal static int RunWhileLeased(string share, string workDirectory, ValidationOptions validation, Action<string> log)
+    {
         var incoming = Path.Combine(share, "incoming");
         var current = CurrentExtract(share);
 
@@ -34,17 +55,22 @@ static partial class Releaser
         }
 
         log($"building extract {candidate.number} from {Path.GetFileName(candidate.path)}");
+        var target = Path.Combine(share, FileName(candidate.number));
+        if (File.Exists(target))
+        {
+            log($"cannot publish {FileName(candidate.number)}: that immutable release already exists");
+            return 1;
+        }
         Directory.CreateDirectory(workDirectory);
         var localDb = Path.Combine(workDirectory, FileName(candidate.number));
         try
         {
             ReleaseBuilder.Build(candidate.path, localDb, log);
-            if (Validator.Validate(localDb, validation, log).Count > 0) return 1;
+            if (Validator.Validate(localDb, validation, log, candidate.number).Count > 0) return 1;
 
-            var target = Path.Combine(share, FileName(candidate.number));
             var temp = target + ".tmp";
             File.Copy(localDb, temp, overwrite: true);
-            File.Move(temp, target, overwrite: true);
+            File.Move(temp, target);
             WriteAtomically(Path.Combine(share, CurrentFile), FileName(candidate.number));
             log($"published {FileName(candidate.number)}");
 
@@ -72,7 +98,9 @@ static partial class Releaser
     public static int CurrentExtract(string share)
     {
         var path = Path.Combine(share, CurrentFile);
-        return File.Exists(path) ? ExtractNumberOfDb(File.ReadAllText(path).Trim()) : 0;
+        if (!File.Exists(path)) return 0;
+        var number = ExtractNumberOfDb(File.ReadAllText(path).Trim());
+        return number > 0 ? number : throw new InvalidDataException("The current release pointer is invalid.");
     }
 
     private static int ExtractNumberOf(string zipPath) =>

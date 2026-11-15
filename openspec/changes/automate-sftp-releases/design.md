@@ -18,7 +18,13 @@ Use the existing `build` job and its configurable cron schedule, proposing `0 6 
 
 Use SFTP, not FTP/FTPS, and the `opendata` directory. Parse exact Full and Update filename patterns and compare extract numbers, not timestamps. Discover and apply all required intermediate updates; never infer a complete chain solely from a date. Verify the provider's documented sequence and Update semantics against the cookbook and real files before implementation.
 
-The independently confirmed ED25519 SHA-256 host-key fingerprint is `SHA256:LcC2+VnBH01X/CGMd44inc/lxMJy/jH1RtwhW9PIGD8`. Reject unknown or changed keys. Retrieve credentials via the platform's approved Key Vault/managed-identity contract, which is still being established. Neither passwords nor secret-bearing connection strings belong in settings, arguments or logs.
+The independently confirmed ED25519 SHA-256 host-key fingerprint is `SHA256:LcC2+VnBH01X/CGMd44inc/lxMJy/jH1RtwhW9PIGD8`. Reject unknown or changed keys. Retrieve the latest version of the mapped secret once per run using the platform's dedicated job identity and `PLATFORM_SECRETS_*` contract. Neither passwords nor secret-bearing connection strings belong in settings, arguments or logs.
+
+The proposed atomic payload is a JSON object with exactly two string properties: `username` and `password`. It supports password and a single password-prompt keyboard-interactive exchange, matching the observed FPS login. The operator must agree this format before enrolling it, and enter the actual JSON only at the platform script's hidden prompt. Reject disabled, expired, not-yet-valid and malformed credentials; never fall back to an older version.
+
+```json
+{"username":"<KBO username>","password":"<KBO password>"}
+```
 
 Download to a non-candidate temporary path, check transfer completion and remote size when available, and rename only after completion. ZIP processing and existing validation remain mandatory; size alone does not establish correctness.
 
@@ -32,7 +38,7 @@ The exact staging schema must preserve duplicate and multi-row semantics. Legacy
 
 Associate each durable state snapshot with its exact extract and release. Persist a complete new state and validated database under new names before switching `current.txt`; a crash before or after the switch must leave a matching state or cause a Full rebuild, never reuse mismatched state. Retain the current and previous release for rollback. A rollback to a release without compatible retained state triggers Full recovery before further incremental work. The next scheduled automatic run may publish a newer release again; pause the job schedule when a rollback must remain in effect.
 
-Serialize the entire release operation across scheduled, manual and retried runs using a crash-recoverable lease or equivalent. An abandoned lease must be recoverable without allowing two active publishers. Temporary downloads and incomplete work are isolated and cleaned up safely; retain only bounded state and archives required for recovery.
+Serialize the entire release operation across scheduled, manual and retried runs using exclusive creation of `.release.lock` on the share. If a process crashes and leaves the lock behind, the operator must confirm that no release run is active before removing that specific lock file. Never reclaim it automatically based only on age. Temporary downloads and incomplete work are isolated and cleaned up safely; retain only bounded state and archives required for recovery.
 
 ### Equivalence gate and capacity
 
@@ -50,7 +56,7 @@ Alternatives considered: rebuilding from Full every run is simpler and remains t
 
 ## Migration Plan
 
-1. Agree the platform secret contract, verify Update semantics, and benchmark a representative real extract and update chain.
-2. Deploy with automatic acquisition and incremental publication disabled until equivalence and capacity gates pass; retain the manual Full path.
-3. Configure the proposed monthly schedule and credentials securely, seed a baseline from Full, then enable automatic acquisition and incremental processing.
-4. On failure, disable automation and use the manual Full path; point `current.txt` to the retained previous release if rollback is needed. Pause scheduled publication to keep a rollback in effect.
+1. Deploy Full-only SFTP acquisition with the proposed monthly schedule and retain the independent manual Full path. Until enrollment and the scoped grant, scheduled ingestion fails closed and leaves the current release untouched.
+2. Agree the credential payload with the operator; enroll the secret with the platform's `infra\scripts\set-app-secret.ps1` and redeploy KBO to establish its scoped read grant. Verify a fresh job, rotation and denied web-identity access.
+3. Verify Update semantics and benchmark a representative real chain; seed a baseline from Full and enable incremental publication only after its equivalence and capacity gates pass.
+4. On failure, use the manual Full path; point `current.txt` to the retained previous release if rollback is needed. Pause scheduled publication to keep a rollback in effect. Existing release files are immutable and cannot be overwritten.

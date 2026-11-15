@@ -11,7 +11,7 @@
     "build": {
       "cpu": "4",
       "memory": "8Gi",
-      "schedule": "0 6 * * *",
+      "schedule": "0 6 1 * *",
       "replicaTimeout": 7200,
       "env": {}
     }

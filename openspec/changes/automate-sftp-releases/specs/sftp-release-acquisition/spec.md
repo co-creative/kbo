@@ -20,7 +20,7 @@ The system SHALL use the configurable build-job schedule to check the KBO SFTP d
 - **THEN** the system orders them by extract number rather than date or directory order
 
 ### Requirement: Secure SFTP connection
-The system SHALL verify the independently confirmed SSH host key and SHALL obtain credentials using the platform-approved secret delivery mechanism. Credentials SHALL NOT appear in app configuration, source files, command arguments or logs.
+The system SHALL verify the independently confirmed SSH host key and SHALL retrieve the latest mapped Key Vault secret once per execution using the dedicated job identity. It SHALL validate the credential payload and secret enabled, expiry and not-before metadata before connecting. Credentials SHALL NOT appear in app configuration, source files, command arguments or logs, and the system SHALL NOT fall back to an older secret version.
 
 #### Scenario: Host key mismatch
 - **WHEN** the server presents a host key that does not match the configured trusted fingerprint
@@ -29,6 +29,18 @@ The system SHALL verify the independently confirmed SSH host key and SHALL obtai
 #### Scenario: Authentication or secret retrieval failure
 - **WHEN** the job cannot obtain valid credentials or authenticate
 - **THEN** the job fails visibly without exposing credentials or replacing the published release
+
+#### Scenario: Invalid secret metadata or payload
+- **WHEN** the latest credential is disabled, expired, not yet valid or malformed
+- **THEN** the job fails without connecting or publishing
+
+#### Scenario: Credential rotation
+- **WHEN** an operator enrolls a valid new secret version under the same name
+- **THEN** the next execution reads that version without an image or configuration change
+
+#### Scenario: Cancelled retrieval
+- **WHEN** credential retrieval is cancelled
+- **THEN** the job stops without connecting or publishing
 
 ### Requirement: Complete downloads only
 The system SHALL keep incomplete downloads out of the release pipeline and verify completed transfers before making files available for processing.
