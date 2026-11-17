@@ -30,5 +30,7 @@
 - [x] 4.3 Configure the daily schedule and monthly Full rebuilds, and enable incremental publication only after the platform secret contract and gates are ready.
 - [x] 4.4 Update `specs/azure-architecture.md` with the revised design, cadence, rollback procedure and measurements; run the repository test suite.
 - [x] 4.5 Agree the username/password JSON payload with the operator; enroll the secret and redeploy to establish the scoped grant.
-- [ ] 4.6 Verify a fresh production ingestion, a new credential version on a subsequent execution, and denied secret access from the web identity.
-  - Production execution `kbo-build-shdhx77` published extract 0545 on 2026-11-15. Rotation and an actual denied read from the web identity remain to be verified.
+- [ ] 4.6 Verify a fresh production ingestion and the first incremental production release.
+  - Production execution `kbo-build-shdhx77` published extract 0545 on 2026-11-15 (Full, built before incremental publication was deployed, so without a source snapshot).
+  - Execution `kbo-build-29914920` rebuilt 0546 as a Full on 2026-11-17 and stored `.state/source-0546.zip`; the next extract should take the incremental path.
+  - Dropped by decision (2026-11-17): rotation is not tested because the SFTP credential is not expected to change; no live denied-read test from the web identity. Configuration check: `id-kbo` (web) has only AcrPull; only `id-kbo-build-secrets` (job only) has Key Vault Secrets User, scoped to `kbo--build--sftp-credential`.
